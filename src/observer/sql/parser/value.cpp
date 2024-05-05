@@ -16,13 +16,25 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/comparator.h"
 #include "common/lang/string.h"
 #include "common/log/log.h"
+#include "common/types.h"
 #include <sstream>
+#include <ctime>
+#include "common/common_utils.h"
 
-const char *ATTR_TYPE_NAME[] = {"undefined", "chars", "ints", "floats", "booleans"};
+// UNDEFINED,
+//     CHARS,     ///< 字符串类型
+//     INTS,      ///< 整数类型(4字节)
+//     FLOATS,    ///< 浮点数类型(4字节)
+//     BOOLEANS,  ///< boolean类型，当前不是由parser解析出来的，是程序内部使用的
+//     DATES,     ///< 日期类型(4字节)
+//     TEXTS,     ///< 长文本类型，等同于字符串
+//     NULLS      ///< null
+
+const char *ATTR_TYPE_NAME[] = {"undefined", "chars", "ints", "floats", "booleans", "dates", "texts", "nulls"};
 
 const char *attr_type_to_string(AttrType type)
 {
-  if (type >= UNDEFINED && type <= FLOATS) {
+  if (type >= UNDEFINED && type <= NULLS) {
     return ATTR_TYPE_NAME[type];
   }
   return "unknown";
@@ -47,109 +59,77 @@ Value::Value(const char *s, int len /*= 0*/) { set_string(s, len); }
 
 void Value::set_data(char *data, int length)
 {
-  switch (attr_type_) {
-    case CHARS: {
-      set_string(data, length);
-    } break;
-    case INTS: {
-      num_value_.int_value_ = *(int *)data;
-      length_               = length;
-    } break;
-    case FLOATS: {
-      num_value_.float_value_ = *(float *)data;
-      length_                 = length;
-    } break;
-    case BOOLEANS: {
-      num_value_.bool_value_ = *(int *)data != 0;
-      length_                = length;
-    } break;
-    default: {
-      LOG_WARN("unknown data type: %d", attr_type_);
-    } break;
-  }
+  data_   = new char[length];
+  length_ = length;
+  memcpy(data_, data, length);
 }
 void Value::set_int(int val)
 {
-  attr_type_            = INTS;
-  num_value_.int_value_ = val;
-  length_               = sizeof(val);
+  attr_type_ = INTS;
+  set_data((char *)&val, 4);
 }
 
 void Value::set_float(float val)
 {
-  attr_type_              = FLOATS;
-  num_value_.float_value_ = val;
-  length_                 = sizeof(val);
+  attr_type_ = FLOATS;
+  set_data((char *)&val, 4);
 }
 void Value::set_boolean(bool val)
 {
-  attr_type_             = BOOLEANS;
-  num_value_.bool_value_ = val;
-  length_                = sizeof(val);
+  attr_type_ = BOOLEANS;
+  set_data((char *)&val, 1);
 }
 void Value::set_string(const char *s, int len /*= 0*/)
 {
   attr_type_ = CHARS;
   if (len > 0) {
-    len = strnlen(s, len);
-    str_value_.assign(s, len);
+    set_data(s, len + 1);
   } else {
-    str_value_.assign(s);
+    set_data("\0", 1);
   }
-  length_ = str_value_.length();
+  length_ = len + 1;
 }
 
 void Value::set_value(const Value &value)
 {
-  switch (value.attr_type_) {
-    case INTS: {
-      set_int(value.get_int());
-    } break;
-    case FLOATS: {
-      set_float(value.get_float());
-    } break;
-    case CHARS: {
-      set_string(value.get_string().c_str());
-    } break;
-    case BOOLEANS: {
-      set_boolean(value.get_boolean());
-    } break;
-    case UNDEFINED: {
-      ASSERT(false, "got an invalid value type");
-    } break;
-  }
+  attr_type_ = value.attr_type_;
+  set_data(value.data_, value.length_);
 }
 
-const char *Value::data() const
-{
-  switch (attr_type_) {
-    case CHARS: {
-      return str_value_.c_str();
-    } break;
-    default: {
-      return (const char *)&num_value_;
-    } break;
-  }
+void Value::set_date(const sql_date date) {
+  attr_type_ = DATES;
+  set_data((char *)&date, 4);
 }
+
+const char *Value::data() const { return data_; }
 
 std::string Value::to_string() const
 {
   std::stringstream os;
   switch (attr_type_) {
     case INTS: {
-      os << num_value_.int_value_;
+      os << *((int *)data_);
     } break;
     case FLOATS: {
-      os << common::double_to_str(num_value_.float_value_);
+      os << common::double_to_str(*((float *)data_));
     } break;
     case BOOLEANS: {
-      os << num_value_.bool_value_;
+      os << *((bool *)data_);
     } break;
     case CHARS: {
-      os << str_value_;
+      os << data_;
+    } break;
+    case DATES: {
+      os << common::date::format(*(sql_date *)data_);
+    } break;
+    case TEXTS: {
+      os << data_;
+    } break;
+    case NULLS: {
+      os << NULL_STRING;
     } break;
     default: {
-      LOG_WARN("unsupported attr type: %d", attr_type_);
+      assert(false);
     } break;
   }
   return os.str();
@@ -157,131 +137,188 @@ std::string Value::to_string() const
 
 int Value::compare(const Value &other) const
 {
-  if (this->attr_type_ == other.attr_type_) {
-    switch (this->attr_type_) {
-      case INTS: {
-        return common::compare_int((void *)&this->num_value_.int_value_, (void *)&other.num_value_.int_value_);
-      } break;
-      case FLOATS: {
-        return common::compare_float((void *)&this->num_value_.float_value_, (void *)&other.num_value_.float_value_);
-      } break;
-      case CHARS: {
-        return common::compare_string((void *)this->str_value_.c_str(),
-            this->str_value_.length(),
-            (void *)other.str_value_.c_str(),
-            other.str_value_.length());
-      } break;
-      case BOOLEANS: {
-        return common::compare_int((void *)&this->num_value_.bool_value_, (void *)&other.num_value_.bool_value_);
-      }
-      default: {
-        LOG_WARN("unsupported type: %d", this->attr_type_);
-      }
-    }
-  } else if (this->attr_type_ == INTS && other.attr_type_ == FLOATS) {
-    float this_data = this->num_value_.int_value_;
-    return common::compare_float((void *)&this_data, (void *)&other.num_value_.float_value_);
-  } else if (this->attr_type_ == FLOATS && other.attr_type_ == INTS) {
-    float other_data = other.num_value_.int_value_;
-    return common::compare_float((void *)&this->num_value_.float_value_, (void *)&other_data);
-  }
-  LOG_WARN("not supported");
-  return -1;  // TODO return rc?
+  int cmp_res = -1;
+  RC  rc      = common::compare(*this, other, cmp_res);
+  return cmp_res;
 }
 
 int Value::get_int() const
 {
-  switch (attr_type_) {
-    case CHARS: {
-      try {
-        return (int)(std::stol(str_value_));
-      } catch (std::exception const &ex) {
-        LOG_TRACE("failed to convert string to number. s=%s, ex=%s", str_value_.c_str(), ex.what());
-        return 0;
-      }
-    }
-    case INTS: {
-      return num_value_.int_value_;
-    }
-    case FLOATS: {
-      return (int)(num_value_.float_value_);
-    }
-    case BOOLEANS: {
-      return (int)(num_value_.bool_value_);
-    }
-    default: {
-      LOG_WARN("unknown data type. type=%d", attr_type_);
-      return 0;
-    }
-  }
-  return 0;
+  int res;
+  assert(common::get_int(*this, res) == RC::SUCCESS);
+  return res;
 }
 
 float Value::get_float() const
 {
-  switch (attr_type_) {
-    case CHARS: {
-      try {
-        return std::stof(str_value_);
-      } catch (std::exception const &ex) {
-        LOG_TRACE("failed to convert string to float. s=%s, ex=%s", str_value_.c_str(), ex.what());
-        return 0.0;
-      }
-    } break;
-    case INTS: {
-      return float(num_value_.int_value_);
-    } break;
-    case FLOATS: {
-      return num_value_.float_value_;
-    } break;
-    case BOOLEANS: {
-      return float(num_value_.bool_value_);
-    } break;
-    default: {
-      LOG_WARN("unknown data type. type=%d", attr_type_);
-      return 0;
-    }
-  }
-  return 0;
+  float res;
+  assert(common::get_float(*this, res) == RC::SUCCESS);
+  return res;
 }
 
 std::string Value::get_string() const { return this->to_string(); }
 
 bool Value::get_boolean() const
 {
-  switch (attr_type_) {
+  bool res;
+  assert(common::get_boolean(*this, res) == RC::SUCCESS);
+  return res;
+}
+Value::~Value() { delete[] data_; }
+Value Value::get_null_value() {
+  Value value;
+  value.data_ = nullptr;
+  value.attr_type_ = NULLS;
+  value.length_ = 0;
+  return value;
+}
+Value::Value(sql_date date) {
+    set_date(date);
+}
+
+RC common::compare(const Value &value1, const Value &value2, int &cmp_res)
+{
+  if (value1.attr_type() == value2.attr_type() || (value1.attr_type() == CHARS && value2.attr_type() == TEXTS) ||
+      (value1.attr_type() == TEXTS && value2.attr_type() == CHARS)) {
+    switch (value1.attr_type()) {
+      case INTS: {
+        cmp_res = common::compare_int((void *)value1.data(), (void *)value2.data());
+      } break;
+      case FLOATS: {
+        cmp_res = common::compare_float((void *)value1.data(), (void *)value2.data());
+      } break;
+      case TEXTS:
+      case CHARS: {
+        cmp_res = common::compare_string(
+            (void *)value1.data(), value1.length() - 1, (void *)value2.data(), value2.length() - 1);
+      } break;
+      case BOOLEANS: {
+        cmp_res = common::compare_bool((void *)value1.data(), (void *)value2.data());
+      } break;
+      default: {
+        return RC::UNCOMPARIBLE;
+      }
+    }
+  } else if ((value1.attr_type() == INTS && value2.attr_type() == FLOATS) ||
+             (value1.attr_type() == FLOATS && value2.attr_type() == INTS)) {
+    float this_data  = value1.get_float();
+    float other_data = value2.get_float();
+    cmp_res          = common::compare_float((void *)&this_data, (void *)&other_data);
+  } else {
+    return RC::UNCOMPARIBLE;
+  }
+  return RC::SUCCESS;
+}
+
+RC common::get_int(const Value &value, int &res)
+{
+  switch (value.attr_type()) {
+    case TEXTS:
     case CHARS: {
       try {
-        float val = std::stof(str_value_);
-        if (val >= EPSILON || val <= -EPSILON) {
-          return true;
-        }
-
-        int int_val = std::stol(str_value_);
-        if (int_val != 0) {
-          return true;
-        }
-
-        return !str_value_.empty();
+        res = (int)(std::stol(value.data()));
       } catch (std::exception const &ex) {
-        LOG_TRACE("failed to convert string to float or integer. s=%s, ex=%s", str_value_.c_str(), ex.what());
-        return !str_value_.empty();
+        return RC::BAD_CAST;
       }
     } break;
     case INTS: {
-      return num_value_.int_value_ != 0;
+      res = *(int *)value.data();
     } break;
     case FLOATS: {
-      float val = num_value_.float_value_;
-      return val >= EPSILON || val <= -EPSILON;
+      res = (int)(*(float *)value.data());
     } break;
     case BOOLEANS: {
-      return num_value_.bool_value_;
+      res = (int)(*(bool *)value.data());
+    } break;
+    case NULLS: {
+      res = 0;
+    } break;
+    case DATES: {
+      res = common::date::get_timestamp(*(sql_date *)value.data());
     } break;
     default: {
-      LOG_WARN("unknown data type. type=%d", attr_type_);
-      return false;
+      return RC::BAD_CAST;
     }
   }
-  return false;
+  return RC::SUCCESS;
+}
+RC common::get_float(const Value &value, float &res)
+{
+  switch (value.attr_type()) {
+    case TEXTS:
+    case CHARS: {
+      try {
+        res = std::stof(value.data());
+      } catch (std::exception const &ex) {
+        return RC::BAD_CAST;
+      }
+    } break;
+    case INTS: {
+      res = (float)*(int *)value.data();
+    } break;
+    case FLOATS: {
+      res = *(float *)value.data();
+    } break;
+    case BOOLEANS: {
+      res = (float)*(bool *)value.data();
+    } break;
+    case DATES: {
+      res = (float)common::date::get_timestamp(*(sql_date *)value.data());
+    } break;
+    case NULLS: {
+      res = 0;
+    } break;
+    default: {
+      return RC::BAD_CAST;
+    }
+  }
+  return RC::SUCCESS;
+}
+RC common::get_string(const Value &value, std::string &res)
+{
+  res = value.to_string();
+  return RC::SUCCESS;
+}
+RC common::get_boolean(const Value &value, bool &res)
+{
+  switch (value.attr_type()) {
+    case TEXTS:
+    case CHARS: {
+      try {
+        float val = std::stof(value.data());
+        if (val >= EPSILON || val <= -EPSILON) {
+          res = true;
+        }
+
+        int int_val = std::stol(value.data());
+        if (int_val != 0) {
+          res = true;
+        }
+
+        res = value.length() != 0;
+      } catch (std::exception const &ex) {
+        return RC::BAD_CAST;
+      }
+    } break;
+    case INTS: {
+      res = *(int *)value.data() != 0;
+    } break;
+    case FLOATS: {
+      float val = *(float *)value.data();
+      res       = val >= EPSILON || val <= -EPSILON;
+    } break;
+    case BOOLEANS: {
+      res = *(bool *)value.data();
+    } break;
+    case DATES: {
+      res = true;
+    } break;
+    case NULLS: {
+      res = false;
+    } break;
+    default: {
+      return RC::BAD_CAST;
+    }
+  }
+  return RC::SUCCESS;
 }

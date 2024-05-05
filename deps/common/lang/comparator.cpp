@@ -31,6 +31,19 @@ int compare_int(void *arg1, void *arg2)
   }
 }
 
+int compare_bool(void *arg1, void *arg2)
+{
+  bool v1 = *(bool *)arg1;
+  bool v2 = *(bool *)arg2;
+  if (v1 > v2) {
+    return 1;
+  } else if (v1 < v2) {
+    return -1;
+  } else {
+    return 0;
+  }
+}
+
 int compare_float(void *arg1, void *arg2)
 {
   float v1  = *(float *)arg1;

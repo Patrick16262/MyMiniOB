@@ -15,6 +15,10 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include <string>
+#include "common/rc.h"
+#include "common/types.h"
+
+#define NULL_STRING "NULL"
 
 /**
  * @brief 属性的类型
@@ -27,6 +31,9 @@ enum AttrType
   INTS,      ///< 整数类型(4字节)
   FLOATS,    ///< 浮点数类型(4字节)
   BOOLEANS,  ///< boolean类型，当前不是由parser解析出来的，是程序内部使用的
+  DATES,     ///< 日期类型(4字节)
+  TEXTS,     ///< 长文本类型，等同于字符串
+  NULLS      ///< null
 };
 
 const char *attr_type_to_string(AttrType type);
@@ -42,16 +49,24 @@ public:
   Value() = default;
 
   Value(AttrType attr_type, char *data, int length = 4) : attr_type_(attr_type) { this->set_data(data, length); }
+  virtual ~Value();
 
   explicit Value(int val);
   explicit Value(float val);
   explicit Value(bool val);
   explicit Value(const char *s, int len = 0);
+  explicit Value(sql_date date);
+  static Value get_null_value();
 
   Value(const Value &other)            = default;
   Value &operator=(const Value &other) = default;
 
   void set_type(AttrType type) { this->attr_type_ = type; }
+  /**
+   * 拷贝data内容
+   * @param data
+   * @param length
+   */
   void set_data(char *data, int length);
   void set_data(const char *data, int length) { this->set_data(const_cast<char *>(data), length); }
   void set_int(int val);
@@ -59,6 +74,7 @@ public:
   void set_boolean(bool val);
   void set_string(const char *s, int len = 0);
   void set_value(const Value &value);
+  void set_date(sql_date date);
 
   std::string to_string() const;
 
@@ -82,12 +98,21 @@ public:
 private:
   AttrType attr_type_ = UNDEFINED;
   int      length_    = 0;
+  char    *data_;
 
-  union
-  {
-    int   int_value_;
-    float float_value_;
-    bool  bool_value_;
-  } num_value_;
-  std::string str_value_;
+  //  union
+  //  {
+  //    int   int_value_;
+  //    float float_value_;
+  //    bool  bool_value_;
+  //  } num_value_;
+  //  std::string str_value_;
 };
+
+namespace common {
+RC compare(const Value &value1, const Value &value2, int &cmp_res);
+RC get_int(const Value &value, int &res);
+RC get_float(const Value &value, float &res);
+RC get_string(const Value &value, std::string &res);
+RC get_boolean(const Value &value, bool &res);
+}  // namespace common

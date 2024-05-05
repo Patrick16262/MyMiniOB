@@ -42,3 +42,9 @@ enum class ReadWriteMode
 
 /// page的CRC校验和
 using CheckSum = unsigned int;
+
+struct sql_date {
+  uint16_t year;
+  uint8_t month;
+  uint8_t day;
+};
