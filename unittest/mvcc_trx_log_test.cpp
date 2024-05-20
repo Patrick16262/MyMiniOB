@@ -133,7 +133,7 @@ TEST(MvccTrxLog, wal)
     ASSERT_NE(table2, nullptr);
 
     RecordFileScanner scanner2;
-    ASSERT_EQ(RC::SUCCESS, table2->get_record_scanner(scanner2, nullptr, ReadWriteMode::READ_ONLY));
+    ASSERT_EQ(RC::SUCCESS, table2->get_record_scanner(scanner2));
     int    count2 = 0;
     RC     rc     = RC::SUCCESS;
     Record record;
@@ -302,7 +302,7 @@ TEST(MvccTrxLog, wal2)
     ASSERT_NE(table2, nullptr);
 
     RecordFileScanner scanner2;
-    ASSERT_EQ(RC::SUCCESS, table2->get_record_scanner(scanner2, nullptr, ReadWriteMode::READ_ONLY));
+    ASSERT_EQ(RC::SUCCESS, table2->get_record_scanner(scanner2));
     int    count2 = 0;
     RC     rc     = RC::SUCCESS;
     Record record;
@@ -319,7 +319,7 @@ TEST(MvccTrxLog, wal2)
     ASSERT_NE(table2, nullptr);
 
     RecordFileScanner scanner2;
-    ASSERT_EQ(RC::SUCCESS, table2->get_record_scanner(scanner2, nullptr, ReadWriteMode::READ_ONLY));
+    ASSERT_EQ(RC::SUCCESS, table2->get_record_scanner(scanner2));
     int    count2 = 0;
     RC     rc     = RC::SUCCESS;
     Record record;
@@ -440,7 +440,7 @@ TEST(MvccTrxLog, wal_rollback)
     ASSERT_NE(table2, nullptr);
 
     RecordFileScanner scanner2;
-    ASSERT_EQ(RC::SUCCESS, table2->get_record_scanner(scanner2, nullptr, ReadWriteMode::READ_ONLY));
+    ASSERT_EQ(RC::SUCCESS, table2->get_record_scanner(scanner2));
     int    visible_count = 0;
     Record record;
     RC     rc = RC::SUCCESS;
@@ -568,7 +568,7 @@ TEST(MvccTrxLog, wal_rollback_half)
     ASSERT_NE(table2, nullptr);
 
     RecordFileScanner scanner2;
-    ASSERT_EQ(RC::SUCCESS, table2->get_record_scanner(scanner2, nullptr, ReadWriteMode::READ_ONLY));
+    ASSERT_EQ(RC::SUCCESS, table2->get_record_scanner(scanner2));
     int    visible_count = 0;
     Record record;
     RC     rc = RC::SUCCESS;
@@ -695,7 +695,7 @@ TEST(MvccTrxLog, wal_rollback_abnormal)
     ASSERT_NE(table2, nullptr);
 
     RecordFileScanner scanner2;
-    ASSERT_EQ(RC::SUCCESS, table2->get_record_scanner(scanner2, nullptr, ReadWriteMode::READ_ONLY));
+    ASSERT_EQ(RC::SUCCESS, table2->get_record_scanner(scanner2));
     int    visible_count = 0;
     Record record;
     RC     rc = RC::SUCCESS;

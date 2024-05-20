@@ -89,7 +89,7 @@ TEST(DoubleWriteBuffer, single_file_normal)
   DiskDoubleWriteBuffer *disk_double_write_buffer = static_cast<DiskDoubleWriteBuffer *>(bpm->get_dblwr_buffer());
   ASSERT_EQ(RC::SUCCESS, disk_double_write_buffer->recover());
 
-  BufferPoolIterator bp_iterator;
+  PageNumIterator bp_iterator;
   ASSERT_EQ(RC::SUCCESS, bp_iterator.init(*buffer_pool, 1));
   vector<FrameId> collected_frames;
   while (bp_iterator.has_next()) {
@@ -187,7 +187,7 @@ TEST(DoubleWriteBuffer, single_file_exception)
   IntegratedLogReplayer log_replayer(*bpm2);
   ASSERT_EQ(RC::SUCCESS, log_handler2.replay(log_replayer, 0));
 
-  BufferPoolIterator bp_iterator;
+  PageNumIterator bp_iterator;
   ASSERT_EQ(RC::SUCCESS, bp_iterator.init(*buffer_pool2, 1));
   vector<FrameId> collected_frames;
   while (bp_iterator.has_next()) {

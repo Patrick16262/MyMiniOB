@@ -27,7 +27,7 @@ using namespace common;
 int buffer_pool_page_count(DiskBufferPool *buffer_pool)
 {
   int                count = 0;
-  BufferPoolIterator iterator;
+  PageNumIterator iterator;
   iterator.init(*buffer_pool, 1);
   while (iterator.has_next()) {
     iterator.next();

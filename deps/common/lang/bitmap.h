@@ -23,9 +23,10 @@ public:
   Bitmap(char *bitmap, int size);
 
   void init(char *bitmap, int size);
-  bool get_bit(int index);
+  bool get_bit(int index) const;
   void set_bit(int index);
   void clear_bit(int index);
+  int size() const;
 
   /**
    * @param start 从哪个位开始查找，start是包含在内的

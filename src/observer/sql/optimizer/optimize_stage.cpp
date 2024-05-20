@@ -25,6 +25,7 @@ See the Mulan PSL v2 for more details. */
 #include "event/sql_event.h"
 #include "sql/operator/logical_operator.h"
 #include "sql/stmt/stmt.h"
+#include "common/console_logging.h"
 
 using namespace std;
 using namespace common;
@@ -36,27 +37,27 @@ RC OptimizeStage::handle_request(SQLStageEvent *sql_event)
   RC                          rc = create_logical_plan(sql_event, logical_operator);
   if (rc != RC::SUCCESS) {
     if (rc != RC::UNIMPLENMENT) {
-      LOG_WARN("failed to create logical plan. rc=%s", strrc(rc));
+      STD_ERROR("failed to create logical plan. rc=%s", strrc(rc));
     }
     return rc;
   }
 
   rc = rewrite(logical_operator);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to rewrite plan. rc=%s", strrc(rc));
+      STD_ERROR("failed to rewrite plan. rc=%s", strrc(rc));
     return rc;
   }
 
   rc = optimize(logical_operator);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to optimize plan. rc=%s", strrc(rc));
+      STD_ERROR("failed to optimize plan. rc=%s", strrc(rc));
     return rc;
   }
 
   unique_ptr<PhysicalOperator> physical_operator;
   rc = generate_physical_plan(logical_operator, physical_operator);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to generate physical plan. rc=%s", strrc(rc));
+      STD_ERROR("failed to generate physical plan. rc=%s", strrc(rc));
     return rc;
   }
 

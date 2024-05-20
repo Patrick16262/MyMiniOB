@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/buffer/frame.h"
 #include "session/session.h"
 #include "session/thread_data.h"
+#include "common/console_logging.h"
 
 using namespace std;
 

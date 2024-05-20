@@ -99,6 +99,7 @@ protected:
 };
 
 /**
+ * 一个内存池罢了
  * MemoryPoolSimple is a simple Memory Pool manager
  * The objects is constructed when creating the pool and destructed when the pool is cleanup.
  * `alloc` calls T's `reinit` routine and `free` calls T's `reset`
@@ -113,6 +114,7 @@ public:
 
   /**
    * init memory pool, the major job is to alloc memory for memory pool
+   *
    * @param pool_num, memory pool's number
    * @param item_num_per_pool, how many items per pool.
    * @return 0 for success and others failure

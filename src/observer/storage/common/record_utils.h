@@ -2,13 +2,9 @@
 // Created by root on 5/6/24.
 //
 
-#ifndef MINIDB_RECORD_UTILS_H
-#define MINIDB_RECORD_UTILS_H
+#pragma once
 
+#include "storage/record/record.h"
 
-class record_utils {
-
-};
-
-
-#endif //MINIDB_RECORD_UTILS_H
+Record *generate_expanded_data(const char *data, int length, int sep_len);
+void move_to_last(Record& record, Record* record_list);

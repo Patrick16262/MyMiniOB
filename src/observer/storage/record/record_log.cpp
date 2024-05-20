@@ -250,7 +250,7 @@ RC RecordLogReplayer::replay_insert(DiskBufferPool &buffer_pool, const RecordLog
   VacuousLogHandler vacuous_log_handler;
   RecordPageHandler record_page_handler;
 
-  RC rc = record_page_handler.init(buffer_pool, vacuous_log_handler, log_header.page_num, ReadWriteMode::READ_WRITE);
+  RC rc = record_page_handler.init(buffer_pool, log_header.page_num, ReadWriteMode::READ_WRITE);
   if (OB_FAIL(rc)) {
     LOG_WARN("fail to init record page handler. page num=%d, rc=%s", log_header.page_num, strrc(rc));
     return rc;
@@ -258,7 +258,7 @@ RC RecordLogReplayer::replay_insert(DiskBufferPool &buffer_pool, const RecordLog
 
   const char *record = log_header.data;
   RID         rid(log_header.page_num, log_header.slot_num);
-  rc = record_page_handler.insert_record(record, &rid);
+  rc = record_page_handler.insert_record_part(record, {-1, -1}, 0, &rid);
   if (OB_FAIL(rc)) {
     LOG_WARN("fail to recover insert record. page num=%d, slot num=%d, rc=%s", 
              log_header.page_num, log_header.slot_num, strrc(rc));
@@ -273,14 +273,14 @@ RC RecordLogReplayer::replay_delete(DiskBufferPool &buffer_pool, const RecordLog
   VacuousLogHandler vacuous_log_handler;
   RecordPageHandler record_page_handler;
 
-  RC rc = record_page_handler.init(buffer_pool, vacuous_log_handler, log_header.page_num, ReadWriteMode::READ_WRITE);
+  RC rc = record_page_handler.init(buffer_pool, log_header.page_num, ReadWriteMode::READ_WRITE);
   if (OB_FAIL(rc)) {
     LOG_WARN("fail to init record page handler. page num=%d, rc=%s", log_header.page_num, strrc(rc));
     return rc;
   }
 
   RID rid(log_header.page_num, log_header.slot_num);
-  rc = record_page_handler.delete_record(&rid);
+  rc = record_page_handler.erase_bitmap(&rid);
   if (OB_FAIL(rc)) {
     LOG_WARN("fail to recover delete record. page num=%d, slot num=%d, rc=%s", 
              log_header.page_num, log_header.slot_num, strrc(rc));
@@ -295,14 +295,14 @@ RC RecordLogReplayer::replay_update(DiskBufferPool &buffer_pool, const RecordLog
   VacuousLogHandler vacuous_log_handler;
   RecordPageHandler record_page_handler;
 
-  RC rc = record_page_handler.init(buffer_pool, vacuous_log_handler, header.page_num, ReadWriteMode::READ_WRITE);
+  RC rc = record_page_handler.init(buffer_pool, header.page_num, ReadWriteMode::READ_WRITE);
   if (OB_FAIL(rc)) {
     LOG_WARN("fail to init record page handler. page num=%d, rc=%s", header.page_num, strrc(rc));
     return rc;
   }
 
   RID rid(header.page_num, header.slot_num);
-  rc = record_page_handler.update_record(rid, header.data);
+  rc = record_page_handler.update_record_part(rid, header.data);
   if (OB_FAIL(rc)) {
     LOG_WARN("fail to recover update record. page num=%d, slot num=%d, rc=%s", 
              header.page_num, header.slot_num, strrc(rc));

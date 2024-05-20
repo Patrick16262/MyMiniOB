@@ -51,14 +51,10 @@ TEST(RecordPageHandler, test_record_page_handler)
   rc           = bp->allocate_page(&frame);
   ASSERT_EQ(rc, RC::SUCCESS);
 
-  RecordFileHandler record_file_handler;
-  rc = record_file_handler.init(*bp, log_handler);
-
-
   const int         record_size = 8;
-//  RecordPageHandler record_page_handle;
-//  rc = record_page_handle.init_empty_page(*bp, log_handler, frame->page_num(), record_size);
-//  ASSERT_EQ(rc, RC::SUCCESS);
+  RecordPageHandler record_page_handle;
+  rc = record_page_handle.init_empty_page(*bp, log_handler, frame->page_num(), record_size);
+  ASSERT_EQ(rc, RC::SUCCESS);
 
   RecordNumIteratord iterator;
     iterator.init(record_page_handle, 0, ReadWriteMode::READ_WRITE);

@@ -13,3 +13,4 @@ namespace common::date {
   bool is_validate(sql_date date);
   int get_timestamp(sql_date date);
 }
+

@@ -80,12 +80,17 @@ public:
   RC delete_record(const RID &rid);
   RC get_record(const RID &rid, Record &record);
 
+  /**
+   * 通过日志恢复数据的功能，看起来还没有做完
+   * @param record
+   * @return
+   */
   RC recover_insert_record(Record &record);
 
   // TODO refactor
   RC create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name);
 
-  RC get_record_scanner(RecordFileScanner &scanner, Trx *trx, ReadWriteMode mode);
+  void get_record_scanner(RecordFileScanner &scanner);
 
   RecordFileHandler *record_handler() const { return record_handler_; }
 

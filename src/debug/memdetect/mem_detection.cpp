@@ -3,7 +3,6 @@
 //
 #include <mutex>
 #include <cassert>
-#include "backward.hpp"
 #include "unordered_map"
 #include <dlfcn.h>
 #include "mem_detection.h"
@@ -16,12 +15,10 @@ using sep_t = unsigned long long int;
 #define APPLICATION_DATA_SIZE (1024 * 1024 * 512)
 
 using namespace std;
-using namespace backward;
 
 
 struct allocate_info {
     size_t size;
-    StackTrace st;
     sep_t *start_sep;
     sep_t *end_sep;
 };
@@ -52,10 +49,8 @@ public:
         }
         void *res = available_ + SEP_SIZE;
         allocated_[res] = {size,
-                           StackTrace(),
                            (sep_t *) available_,
                            (sep_t *) (available_ + size + SEP_SIZE)};
-        allocated_[res].st.load_here();
         available_ += size + 2 * SEP_SIZE;
         *allocated_[res].start_sep = SEP_VALUE;
         *allocated_[res].end_sep = SEP_VALUE;
@@ -72,15 +67,14 @@ public:
         return true;
     }
 
-    void enable_memory_detect() {
-        enabled = true;
+    void check_double_free(void *) {
+
     }
 
     void check_overflow(const pair<void *, allocate_info> &pair) {
         auto &info = pair.second;
-        bool is_overflow = false;
+
         if (*info.start_sep != SEP_VALUE) {
-            is_overflow = true;
 
             printf("overflow detected on %p, position: left\n", pair.first);
             printf("original: ");
@@ -92,7 +86,6 @@ public:
         }
 
         if (*info.end_sep != SEP_VALUE) {
-            is_overflow = true;
 
             printf("overflow detected on %p, position: right\n", pair.first);
             printf("original: ");
@@ -102,68 +95,66 @@ public:
             print_lb64(*info.end_sep);
             printf("\n");
         }
-
-        if (is_overflow) {
-            p.print(info.st, stdout);
-            printf("overflow detected\n");
-        }
     }
 
     OverflowDetectPool() {
-        p.address = true;
-        p.object = true;
-        p.color_mode = ColorMode::always;
         data_ = new char[APPLICATION_DATA_SIZE];
         available_ = data_;
     }
 
-    bool is_enabled() const {
-        return enabled;
-    }
-
 
 private:
-    Printer p;
     unordered_map<void *, allocate_info> allocated_;
     char *data_ = nullptr;
     char *available_ = nullptr;
-    bool enabled = false;
 };
+
+static bool enabled = false;
 
 static OverflowDetectPool pool;
 
 
 typedef void *(*malloc_t)(size_t size);
 
-static malloc_t malloc_f = NULL;
+static malloc_t malloc_f = nullptr;
 
 typedef void (*free_t)(void *p);
 
-static free_t free_f = NULL;
+static free_t free_f = nullptr;
 
 //要hook的同名函数
 void *malloc(size_t size) {
-    if (malloc_f == NULL) {
+    if (malloc_f == nullptr) {
         malloc_f = (malloc_t) dlsym(RTLD_NEXT, "malloc"); //除了RTLD_NEXT 还有一个参数RTLD_DEFAULT
     }
     static bool recursive = false;
-    if (!recursive && pool.is_enabled()) {
+
+    void *res = nullptr;
+    if (!recursive && enabled) {
         recursive = true;
-        void *res = pool.allocate(size);
-        if (res != nullptr) {
-            return res;
-        }
-        recursive = false;
+        res = pool.allocate(size);
     }
-    return malloc_f(size);
+    if (res == nullptr) {
+        res = malloc_f(size);
+    }
+    recursive = false;
+    return res;
 }
 
 void free(void *p) {
-    if (free_f == NULL) {
-        free_f = (free_t) dlsym(RTLD_NEXT, "free");
-    }
     static bool recursive = false;
-    if (!recursive && pool.is_enabled()) {
+    if (free_f == nullptr) {
+        static bool inner_recursive = false;
+        if (!inner_recursive) {
+            inner_recursive = true;
+            free_f = (free_t) dlsym(RTLD_NEXT, "free");
+        } else {
+            //do nothing
+            return;
+        }
+        inner_recursive = false;
+    }
+    if (!recursive && enabled) {
         recursive = true;
         if (pool.deallocate(p)) {
             recursive = false;
@@ -175,5 +166,5 @@ void free(void *p) {
 }
 
 void enable_mem_debug() {
-    pool.enable_memory_detect();
+    enabled = true;
 }

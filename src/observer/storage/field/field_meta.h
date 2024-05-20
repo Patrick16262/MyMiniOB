@@ -20,40 +20,57 @@ See the Mulan PSL v2 for more details. */
 #include "sql/parser/parse_defs.h"
 
 namespace Json {
-class Value;
+    class Value;
 }  // namespace Json
 
 /**
  * @brief 字段元数据
  *
  */
-class FieldMeta
-{
+class FieldMeta {
 public:
-  FieldMeta();
-  FieldMeta(const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible);
-  ~FieldMeta() = default;
+    FieldMeta();
 
-  RC init(const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible);
+    /**
+     * 构造函数有几个缺省字段默认为false
+     */
+    ~FieldMeta() = default;
 
-public:
-  const char *name() const;
-  AttrType    type() const;
-  int         offset() const;
-  int         len() const;
-  bool        visible() const;
+    void init(const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible, bool len_variable,
+              bool nullable, bool unique);
 
 public:
-  void desc(std::ostream &os) const;
+    const char *name() const;
+
+    AttrType type() const;
+
+    int offset() const;
+
+    int len() const;
+
+    bool visible() const;
+
+    bool is_len_variable() const;
+
+    bool unique() const;
+
+    bool nullable() const;
 
 public:
-  void      to_json(Json::Value &json_value) const;
-  static RC from_json(const Json::Value &json_value, FieldMeta &field);
+    void desc(std::ostream &os) const;
+
+public:
+    void to_json(Json::Value &json_value) const;
+
+    static void from_json(const Json::Value &json_value, FieldMeta &field);
 
 protected:
-  std::string name_;
-  AttrType    attr_type_;
-  int         attr_offset_;
-  int         attr_len_;
-  bool        visible_;
+    std::string name_;
+    AttrType attr_type_;
+    int attr_offset_;
+    int attr_len_;
+    bool visible_;
+    bool actual_len_variable_;
+    bool nullable_;
+    bool unique_;
 };

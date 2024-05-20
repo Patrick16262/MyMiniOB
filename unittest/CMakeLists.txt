@@ -5,6 +5,8 @@ INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/observer)
 
 find_package(GTest CONFIG REQUIRED)
 
+ADD_DEFINITIONS(-DBACKWARD_HAS_BFD)
+
 include(GoogleTest)
 #get_filename_component(<VAR> FileName
 #        PATH|ABSOLUTE|NAME|EXT|NAME_WE|REALPATH
@@ -14,8 +16,7 @@ FILE(GLOB_RECURSE ALL_SRC *.cpp)
 FOREACH (F ${ALL_SRC})
     get_filename_component(prjName ${F} NAME_WE)
     MESSAGE("Build ${prjName} according to ${F}")
-    ADD_EXECUTABLE(${prjName} ${F})
+    ADD_EXECUTABLE(${prjName} ${F} )
     # 不是所有的单测都需要链接observer_static
-    TARGET_LINK_LIBRARIES(${prjName} common pthread dl gtest gtest_main observer_static)
-    gtest_discover_tests(${prjName})
+    TARGET_LINK_LIBRARIES(${prjName} common pthread dl gtest gtest_main observer_static backward bfd)
 ENDFOREACH (F)

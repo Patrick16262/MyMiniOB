@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 //
 
 #pragma once
+#include "console_logging.h"
 
 /**
  * @brief 这个文件定义函数返回码/错误码(Return Code)
@@ -42,6 +43,8 @@ See the Mulan PSL v2 for more details. */
   DEFINE_RC(RECORD_EOF)                  \
   DEFINE_RC(RECORD_NOT_EXIST)            \
   DEFINE_RC(RECORD_INVISIBLE)            \
+  DEFINE_RC(RECORD_TYPE_UNEXPECTED)      \
+  DEFINE_RC(RECORD_TYPE_ERROR)           \
   DEFINE_RC(SCHEMA_DB_EXIST)             \
   DEFINE_RC(SCHEMA_DB_NOT_EXIST)         \
   DEFINE_RC(SCHEMA_DB_NOT_OPENED)        \
@@ -78,14 +81,14 @@ See the Mulan PSL v2 for more details. */
   DEFINE_RC(LOG_ENTRY_INVALID)           \
   DEFINE_RC(BAD_CAST)                    \
   DEFINE_RC(UNCOMPARIBLE)
-enum class RC
-{
+enum class RC {
 #define DEFINE_RC(name) name,
-  DEFINE_RCS
+    DEFINE_RCS
 #undef DEFINE_RC
 };
 
 extern const char *strrc(RC rc);
 
 extern bool OB_SUCC(RC rc);
+
 extern bool OB_FAIL(RC rc);

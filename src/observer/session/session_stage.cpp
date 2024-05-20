@@ -26,6 +26,7 @@ See the Mulan PSL v2 for more details. */
 #include "net/communicator.h"
 #include "net/server.h"
 #include "session/session.h"
+#include "common/console_logging.h"
 
 using namespace common;
 
@@ -33,39 +34,37 @@ using namespace common;
 SessionStage::~SessionStage() {}
 
 // TODO remove me
-void SessionStage::handle_request(SessionEvent *sev)
-{
-  std::string sql = sev->query();
-  if (common::is_blank(sql.c_str())) {
-    return;
-  }
+void SessionStage::handle_request(SessionEvent *sev) {
+    std::string sql = sev->query();
+    if (common::is_blank(sql.c_str())) {
+        return;
+    }
 
-  Session::set_current_session(sev->session());
-  sev->session()->set_current_request(sev);
-  SQLStageEvent sql_event(sev, sql);
-  (void)handle_sql(&sql_event);
+    Session::set_current_session(sev->session());
+    sev->session()->set_current_request(sev);
+    SQLStageEvent sql_event(sev, sql);
+    (void) handle_sql(&sql_event);
 
-  Communicator *communicator    = sev->get_communicator();
-  bool          need_disconnect = false;
-  RC            rc              = communicator->write_result(sev, need_disconnect);
-  LOG_INFO("write result return %s", strrc(rc));
-  if (need_disconnect) {
-    // do nothing
-  }
-  sev->session()->set_current_request(nullptr);
-  Session::set_current_session(nullptr);
+    Communicator *communicator = sev->get_communicator();
+    bool need_disconnect = false;
+    RC rc = communicator->write_result(sev, need_disconnect);
+    LOG_INFO("write result return %s", strrc(rc));
+    if (need_disconnect) {
+        // do nothing
+    }
+    sev->session()->set_current_request(nullptr);
+    Session::set_current_session(nullptr);
 }
 
-void SessionStage::handle_request2(SessionEvent *event)
-{
-  const std::string &sql = event->query();
-  if (common::is_blank(sql.c_str())) {
-    return;
-  }
+void SessionStage::handle_request2(SessionEvent *event) {
+    const std::string &sql = event->query();
+    if (common::is_blank(sql.c_str())) {
+        return;
+    }
 
-  Session::set_current_session(event->session());
-  event->session()->set_current_request(event);
-  SQLStageEvent sql_event(event, sql);
+    Session::set_current_session(event->session());
+    event->session()->set_current_request(event);
+    SQLStageEvent sql_event(event, sql);
 }
 
 /**
@@ -78,37 +77,43 @@ void SessionStage::handle_request2(SessionEvent *event)
  * execute_stage中的执行，通过explain语句看需要哪些operator，然后找对应的operator来
  * 调试或者看代码执行过程即可。
  */
-RC SessionStage::handle_sql(SQLStageEvent *sql_event)
-{
-  RC rc = query_cache_stage_.handle_request(sql_event);
-  if (OB_FAIL(rc)) {
-    LOG_TRACE("failed to do query cache. rc=%s", strrc(rc));
-    return rc;
-  }
+RC SessionStage::handle_sql(SQLStageEvent *sql_event) {
+    STD_INFO("query cache stage");
+    RC rc = query_cache_stage_.handle_request(sql_event);
 
-  rc = parse_stage_.handle_request(sql_event);
-  if (OB_FAIL(rc)) {
-    LOG_TRACE("failed to do parse. rc=%s", strrc(rc));
-    return rc;
-  }
+    if (OB_FAIL(rc)) {
+        STD_WARN("failed to do query cache. rc=%s", strrc(rc));
+        return rc;
+    }
 
-  rc = resolve_stage_.handle_request(sql_event);
-  if (OB_FAIL(rc)) {
-    LOG_TRACE("failed to do resolve. rc=%s", strrc(rc));
-    return rc;
-  }
 
-  rc = optimize_stage_.handle_request(sql_event);
-  if (rc != RC::UNIMPLENMENT && rc != RC::SUCCESS) {
-    LOG_TRACE("failed to do optimize. rc=%s", strrc(rc));
-    return rc;
-  }
+    STD_INFO("parse stage");
+    rc = parse_stage_.handle_request(sql_event);
+    if (OB_FAIL(rc)) {
+        STD_WARN("failed to do parse. rc=%s", strrc(rc));
+        return rc;
+    }
 
-  rc = execute_stage_.handle_request(sql_event);
-  if (OB_FAIL(rc)) {
-    LOG_TRACE("failed to do execute. rc=%s", strrc(rc));
-    return rc;
-  }
+    STD_INFO("resolve stage");
+    rc = resolve_stage_.handle_request(sql_event);
+    if (OB_FAIL(rc)) {
+        STD_WARN("failed to do resolve. rc=%s", strrc(rc));
+        return rc;
+    }
 
-  return rc;
+    STD_INFO("optimize stage");
+    rc = optimize_stage_.handle_request(sql_event);
+    if (rc != RC::UNIMPLENMENT && rc != RC::SUCCESS) {
+        STD_WARN("failed to do optimize. rc=%s", strrc(rc));
+        return rc;
+    }
+
+    STD_INFO("execute stage");
+    rc = execute_stage_.handle_request(sql_event);
+    if (OB_FAIL(rc)) {
+        STD_WARN("failed to do execute. rc=%s", strrc(rc));
+        return rc;
+    }
+    STD_INFO("SessionStage Success");
+    return rc;
 }

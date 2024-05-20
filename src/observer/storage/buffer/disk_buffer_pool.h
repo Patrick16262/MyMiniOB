@@ -79,10 +79,10 @@ struct BPFileHeader
 /**
  * @brief 管理页面Frame
  * @ingroup BufferPool
- * @details 管理内存中的页帧。内存是有限的，内存中能够存放的页帧个数也是有限的。
- * 当内存中的页帧不够用时，需要从内存中淘汰一些页帧，以便为新的页帧腾出空间。
- * 这个管理器负责为所有的BufferPool提供页帧管理服务，也就是所有的BufferPool磁盘文件
- * 在访问时都使用这个管理器映射到内存。
+ * @details
+ * 负责为所有的BufferPool提供页帧管理服务，是所有Bufferpool的祖宗
+ * 当内存中的页帧不够用时，需要从内存中淘汰一些页帧。
+ *
  */
 class BPFrameManager
 {
@@ -121,6 +121,9 @@ public:
   /**
    * 尽管frame中已经包含了buffer_pool_id和page_num，但是依然要求
    * 传入，因为frame可能忘记初始化或者没有初始化
+   * 只有两步
+   * 1.获取锁
+   * 2.调用free_internal()
    */
   RC free(int buffer_pool_id, PageNum page_num, Frame *frame);
 
@@ -142,6 +145,13 @@ public:
 
 private:
   Frame *get_internal(const FrameId &frame_id);
+  /**
+   * 1. 调用frames_.unpin();
+   * 2. 调用frames_.remove(frame_id);
+   * 3. 调用allocator_.free(frame);
+   * @param frame_id 要删除的帧的id
+   * @param frame 要删除的帧的引用
+   */
   RC     free_internal(const FrameId &frame_id, Frame *frame);
 
 private:
@@ -155,24 +165,26 @@ private:
   using FrameAllocator = common::MemPoolSimple<Frame>;
 
   std::mutex     lock_;
-  FrameLruCache  frames_;
-  FrameAllocator allocator_;
+  FrameLruCache  frames_; //frame的hashmap，LruCache就是个hashmap
+  FrameAllocator allocator_; //内存池
 };
 
 /**
- * @brief 用于遍历BufferPool中的所有页面
+ * 原名为BufferPoolIterator,
+ * @brief 用于遍历文件中的所有页面
  * @ingroup BufferPool
  */
-class BufferPoolIterator
+class PageNumIterator
 {
 public:
-  BufferPoolIterator();
-  ~BufferPoolIterator();
+  PageNumIterator();
+  ~PageNumIterator();
 
-  RC      init(DiskBufferPool &bp, PageNum start_page = 0);
+  RC      init(DiskBufferPool &bp, PageNum start_page = 1);
   bool    has_next();
   PageNum next();
   RC      reset();
+
 
 private:
   common::Bitmap bitmap_;
@@ -188,8 +200,8 @@ private:
 class DiskBufferPool final
 {
 public:
-  DiskBufferPool(BufferPoolManager &bp_manager, BPFrameManager &frame_manager, DoubleWriteBuffer &dblwr_manager,
-      LogHandler &log_handler);
+  DiskBufferPool(BufferPoolManager &bp_manager, BPFrameManager &frame_manager,
+                 DoubleWriteBuffer &dblwr_manager, LogHandler &log_handler);
   ~DiskBufferPool();
 
   /**
@@ -268,6 +280,8 @@ public:
   RC redo_allocate_page(LSN lsn, PageNum page_num);
   RC redo_deallocate_page(LSN lsn, PageNum page_num);
 
+  bool is_file_empty() const;
+
 public:
   int32_t id() const { return buffer_pool_id_; }
 
@@ -278,6 +292,9 @@ protected:
 
   /**
    * 刷新指定页面到磁盘(flush)，并且释放关联的Frame
+   * 1. 取消引用
+   * 2. 刷新到磁盘（如果脏了）
+   * 3. 调用frame_manager_.free()删除该页
    */
   RC purge_frame(PageNum page_num, Frame *used_frame);
   RC check_page_num(PageNum page_num);
@@ -307,11 +324,11 @@ private:
 
   std::string file_name_;  /// 文件名
 
-  common::Mutex lock_;
-  common::Mutex wr_lock_;
+  common::Mutex lock_;    /// 创建新页，获取叶子
+  common::Mutex wr_lock_; ///write和load_page时加此锁
 
 private:
-  friend class BufferPoolIterator;
+  friend class PageNumIterator;
 };
 
 /**

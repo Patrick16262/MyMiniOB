@@ -63,13 +63,13 @@ DiskDoubleWriteBuffer::~DiskDoubleWriteBuffer()
 RC DiskDoubleWriteBuffer::open_file(const char *filename)
 {
   if (file_desc_ >= 0) {
-    LOG_ERROR("Double write buffer has already opened. file desc=%d", file_desc_);
+    STD_ERROR("Double write buffer has already opened. file desc=%d", file_desc_);
     return RC::BUFFERPOOL_OPEN;
   }
   
   int fd = open(filename, O_CREAT | O_RDWR, 0644);
   if (fd < 0) {
-    LOG_ERROR("Failed to open or creat %s, due to %s.", filename, strerror(errno));
+    STD_ERROR("Failed to open or creat %s, due to %s.", filename, strerror(errno));
     return RC::SCHEMA_DB_EXIST;
   }
 
@@ -115,24 +115,24 @@ RC DiskDoubleWriteBuffer::add_page(DiskBufferPool *bp, PageNum page_num, Page &p
 
   int64_t offset = page_cnt * DoubleWritePage::SIZE + DoubleWriteBufferHeader::SIZE;
   if (lseek(file_desc_, offset, SEEK_SET) == -1) {
-    LOG_ERROR("Failed to add page %lld of %d due to failed to seek %s.", offset, file_desc_, strerror(errno));
+    STD_ERROR("Failed to add page %ld of %d due to failed to seek %s.", offset, file_desc_, strerror(errno));
     return RC::IOERR_SEEK;
   }
 
   if (writen(file_desc_, dblwr_page, DoubleWritePage::SIZE) != 0) {
-    LOG_ERROR("Failed to add page %lld of %d due to %s.", offset, file_desc_, strerror(errno));
+    STD_ERROR("Failed to add page %ld of %d due to %s.", offset, file_desc_, strerror(errno));
     return RC::IOERR_WRITE;
   }
 
   if (page_cnt + 1 > header_.page_cnt) {
     header_.page_cnt = page_cnt + 1;
     if (lseek(file_desc_, 0, SEEK_SET) == -1) {
-      LOG_ERROR("Failed to add page header due to failed to seek %s.", strerror(errno));
+      STD_ERROR("Failed to add page header due to failed to seek %s.", strerror(errno));
       return RC::IOERR_SEEK;
     }
 
     if (writen(file_desc_, &header_, sizeof(header_)) != 0) {
-      LOG_ERROR("Failed to add page header due to %s.", strerror(errno));
+      STD_ERROR("Failed to add page header due to %s.", strerror(errno));
       return RC::IOERR_WRITE;
     }
   }
@@ -140,7 +140,7 @@ RC DiskDoubleWriteBuffer::add_page(DiskBufferPool *bp, PageNum page_num, Page &p
   if (static_cast<int>(dblwr_pages_.size()) >= max_pages_) {
     RC rc = flush_page();
     if (rc != RC::SUCCESS) {
-      LOG_ERROR("Failed to flush pages in double write buffer");
+      STD_ERROR("Failed to flush pages in double write buffer");
       return rc;
     }
   }
@@ -216,23 +216,23 @@ RC DiskDoubleWriteBuffer::clear_pages(DiskBufferPool *buffer_pool)
 RC DiskDoubleWriteBuffer::load_pages()
 {
   if (file_desc_ < 0) {
-    LOG_ERROR("Failed to load pages, due to file desc is invalid.");
+    STD_ERROR("Failed to load pages, due to file desc is invalid.");
     return RC::BUFFERPOOL_OPEN;
   }
 
   if (!dblwr_pages_.empty()) {
-    LOG_ERROR("Failed to load pages, due to double write buffer is not empty. opened?");
+    STD_ERROR("Failed to load pages, due to double write buffer is not empty. opened?");
     return RC::BUFFERPOOL_OPEN;
   }
 
   if (lseek(file_desc_, 0, SEEK_SET) == -1) {
-    LOG_ERROR("Failed to load page header, due to failed to lseek:%s.", strerror(errno));
+    STD_ERROR("Failed to load page header, due to failed to lseek:%s.", strerror(errno));
     return RC::IOERR_SEEK;
   }
 
   int ret = readn(file_desc_, &header_, sizeof(header_));
   if (ret != 0 && ret != -1) {
-    LOG_ERROR("Failed to load page header, file_desc:%d, due to failed to read data:%s, ret=%d",
+    STD_ERROR("Failed to load page header, file_desc:%d, due to failed to read data:%s, ret=%d",
                 file_desc_, strerror(errno), ret);
     return RC::IOERR_READ;
   }
@@ -241,7 +241,7 @@ RC DiskDoubleWriteBuffer::load_pages()
     int64_t offset = ((int64_t)page_num) * DoubleWritePage::SIZE + DoubleWriteBufferHeader::SIZE;
 
     if (lseek(file_desc_, offset, SEEK_SET) == -1) {
-      LOG_ERROR("Failed to load page %d, offset=%ld, due to failed to lseek:%s.", page_num, offset, strerror(errno));
+      STD_ERROR("Failed to load page %d, offset=%ld, due to failed to lseek:%s.", page_num, offset, strerror(errno));
       return RC::IOERR_SEEK;
     }
 
@@ -251,7 +251,7 @@ RC DiskDoubleWriteBuffer::load_pages()
 
     ret = readn(file_desc_, dblwr_page.get(), DoubleWritePage::SIZE);
     if (ret != 0) {
-      LOG_ERROR("Failed to load page, file_desc:%d, page num:%d, due to failed to read data:%s, ret=%d, page count=%d",
+      STD_ERROR("Failed to load page, file_desc:%d, page num:%d, due to failed to read data:%s, ret=%d, page count=%d",
                 file_desc_, page_num, strerror(errno), ret, page_num);
       return RC::IOERR_READ;
     }

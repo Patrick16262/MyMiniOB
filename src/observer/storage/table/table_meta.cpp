@@ -44,20 +44,11 @@ void TableMeta::swap(TableMeta &other) noexcept
   std::swap(record_size_, other.record_size_);
 }
 
-RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMeta> *trx_fields,
-                   span<const AttrInfoSqlNode> attributes)
+void TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMeta> *trx_fields,
+                     span<const AttrInfoSqlNode> attributes)
 {
-  if (common::is_blank(name)) {
-    LOG_ERROR("Name cannot be empty");
-    return RC::INVALID_ARGUMENT;
-  }
-
-  if (attributes.size() == 0) {
-    LOG_ERROR("Invalid argument. name=%s, field_num=%d", name, attributes.size());
-    return RC::INVALID_ARGUMENT;
-  }
-
-  RC rc = RC::SUCCESS;
+    assert(!common::is_blank(name));
+    assert(attributes.size() != 0);
 
   int field_offset  = 0;
   int trx_field_num = 0;
@@ -69,7 +60,8 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
 
     for (size_t i = 0; i < trx_fields->size(); i++) {
       const FieldMeta &field_meta = (*trx_fields)[i];
-      fields_[i] = FieldMeta(field_meta.name(), field_meta.type(), field_offset, field_meta.len(), false /*visible*/);
+      fields_[i].init(field_meta.name(), field_meta.type(), field_offset,
+                      field_meta.len(), false, false, true, false);
       field_offset += field_meta.len();
     }
 
@@ -81,12 +73,11 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
   for (size_t i = 0; i < attributes.size(); i++) {
     const AttrInfoSqlNode &attr_info = attributes[i];
 
-    rc = fields_[i + trx_field_num].init(
-      attr_info.name.c_str(), attr_info.type, field_offset, attr_info.length, true /*visible*/);
-    if (OB_FAIL(rc)) {
-      LOG_ERROR("Failed to init field meta. table name=%s, field name: %s", name, attr_info.name.c_str());
-      return rc;
-    }
+    bool len_variable = (attr_info.type == AttrType::TEXTS);
+
+    fields_[i + trx_field_num].init(
+            attr_info.name.c_str(), attr_info.type, field_offset, attr_info.length, true /*visible*/, len_variable,
+            false, false);
 
     field_offset += attr_info.length;
   }
@@ -95,8 +86,6 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
 
   table_id_ = table_id;
   name_     = name;
-  LOG_INFO("Sussessfully initialized table meta. table id=%d, name=%s", table_id, name);
-  return RC::SUCCESS;
 }
 
 RC TableMeta::add_index(const IndexMeta &index)
@@ -244,7 +233,7 @@ int TableMeta::deserialize(std::istream &is)
     FieldMeta &field = fields[i];
 
     const Json::Value &field_value = fields_value[i];
-    rc                             = FieldMeta::from_json(field_value, field);
+    FieldMeta::from_json(field_value, field);
     if (rc != RC::SUCCESS) {
       LOG_ERROR("Failed to deserialize table meta. table name =%s", table_name.c_str());
       return -1;

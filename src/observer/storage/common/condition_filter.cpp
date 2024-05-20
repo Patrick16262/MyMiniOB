@@ -124,14 +124,14 @@ bool DefaultConditionFilter::filter(const Record &rec) const
 
   if (left_.is_attr) {  // value
     left_value.set_type(attr_type_);
-    left_value.set_data(rec.data() + left_.attr_offset, left_.attr_length);
+      left_value.copy_data(rec.data() + left_.attr_offset, left_.attr_length);
   } else {
     left_value.set_value(left_.value);
   }
 
   if (right_.is_attr) {
     right_value.set_type(attr_type_);
-    right_value.set_data(rec.data() + right_.attr_offset, right_.attr_length);
+      right_value.copy_data(rec.data() + right_.attr_offset, right_.attr_length);
   } else {
     right_value.set_value(right_.value);
   }

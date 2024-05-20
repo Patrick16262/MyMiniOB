@@ -17,71 +17,81 @@ See the Mulan PSL v2 for more details. */
 #include "event/session_event.h"
 #include "event/sql_event.h"
 #include "session/session.h"
+#include "common/console_logging.h"
 
-RC SqlTaskHandler::handle_event(Communicator *communicator)
-{
-  SessionEvent *event = nullptr;
-  RC rc = communicator->read_event(event);
-  if (OB_FAIL(rc)) {
-    return rc;
-  }
+RC SqlTaskHandler::handle_event(Communicator *communicator) {
+    SessionEvent *event = nullptr;
+    RC rc = communicator->read_event(event);
+    if (OB_FAIL(rc)) {
+        return rc;
+    }
 
-  if (nullptr == event) {
+    if (nullptr == event) {
+        return RC::SUCCESS;
+    }
+
+    session_stage_.handle_request2(event);
+
+    SQLStageEvent sql_event(event, event->query());
+
+    (void) handle_sql(&sql_event);
+
+    bool need_disconnect = false;
+
+    rc = communicator->write_result(event, need_disconnect);
+    LOG_INFO("write result return %s", strrc(rc));
+    event->session()->set_current_request(nullptr);
+    Session::set_current_session(nullptr);
+
+    delete event;
+
+    if (need_disconnect) {
+        return RC::INTERNAL;
+    }
     return RC::SUCCESS;
-  }
-
-  session_stage_.handle_request2(event);
-
-  SQLStageEvent sql_event(event, event->query());
-
-  (void)handle_sql(&sql_event);
-
-  bool need_disconnect = false;
-
-  rc = communicator->write_result(event, need_disconnect);
-  LOG_INFO("write result return %s", strrc(rc));
-  event->session()->set_current_request(nullptr);
-  Session::set_current_session(nullptr);
-
-  delete event;
-
-  if (need_disconnect) {
-    return RC::INTERNAL;
-  }
-  return RC::SUCCESS;
 }
 
-RC SqlTaskHandler::handle_sql(SQLStageEvent *sql_event)
-{
-  RC rc = query_cache_stage_.handle_request(sql_event);
-  if (OB_FAIL(rc)) {
-    LOG_TRACE("failed to do query cache. rc=%s", strrc(rc));
-    return rc;
-  }
+RC SqlTaskHandler::handle_sql(SQLStageEvent *sql_event) {
+    STD_INFO("query cache stage: enter ");
+    RC rc = query_cache_stage_.handle_request(sql_event);
+    if (OB_FAIL(rc)) {
+        STD_WARN("failed to do query cache. rc=%s", strrc(rc));
+        return rc;
+    }
+    STD_INFO("query cache stage: exit ");
 
-  rc = parse_stage_.handle_request(sql_event);
-  if (OB_FAIL(rc)) {
-    LOG_TRACE("failed to do parse. rc=%s", strrc(rc));
-    return rc;
-  }
+    STD_INFO("parse stage: enter ");
+    rc = parse_stage_.handle_request(sql_event);
+    if (OB_FAIL(rc)) {
+        STD_WARN("failed to do parse. rc=%s", strrc(rc));
+        return rc;
+    }
+    STD_INFO("parse stage: exit ");
 
-  rc = resolve_stage_.handle_request(sql_event);
-  if (OB_FAIL(rc)) {
-    LOG_TRACE("failed to do resolve. rc=%s", strrc(rc));
-    return rc;
-  }
+    STD_INFO("resolve stage: enter ");
+    rc = resolve_stage_.handle_request(sql_event);
+    if (OB_FAIL(rc)) {
+        STD_WARN("failed to do resolve. rc=%s", strrc(rc));
+        return rc;
+    }
+    STD_INFO("resolve stage: exit ");
 
-  rc = optimize_stage_.handle_request(sql_event);
-  if (rc != RC::UNIMPLENMENT && rc != RC::SUCCESS) {
-    LOG_TRACE("failed to do optimize. rc=%s", strrc(rc));
-    return rc;
-  }
+    STD_INFO("optimize stage: enter ");
+    rc = optimize_stage_.handle_request(sql_event);
+    if (rc != RC::UNIMPLENMENT && rc != RC::SUCCESS) {
+        STD_WARN("failed to do optimize. rc=%s", strrc(rc));
+        return rc;
+    }
+    STD_INFO("optimize stage: exit ");
 
-  rc = execute_stage_.handle_request(sql_event);
-  if (OB_FAIL(rc)) {
-    LOG_TRACE("failed to do execute. rc=%s", strrc(rc));
-    return rc;
-  }
+    STD_INFO("execute stage: enter ");
+    rc = execute_stage_.handle_request(sql_event);
+    if (OB_FAIL(rc)) {
+        STD_WARN("failed to do execute. rc=%s", strrc(rc));
+        return rc;
+    }
+    STD_INFO("execute stage: exit ");
 
-  return rc;
+    STD_INFO("sql task handler: handle sql success.");
+    return rc;
 }
