@@ -19,7 +19,7 @@ OPTION(WITH_BENCHMARK "Compile benchmark" OFF)
 OPTION(WITH_MEMTRACER "Compile memtracer" ON)
 OPTION(ENABLE_COVERAGE "Enable unittest coverage" OFF)
 OPTION(ENABLE_NOPIE "Enable no pie" OFF)
-OPTION(CONCURRENCY "Support concurrency operations" OFF)
+OPTION(CONCURRENCY "Support concurrency operations" ON)
 OPTION(STATIC_STDLIB "Link std library static or dynamic, such as libgcc, libstdc++, libasan" OFF)
 
 MESSAGE(STATUS "HOME dir: $ENV{HOME}")

@@ -13,7 +13,9 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/expr/expression.h"
+#include "common/rc.h"
 #include "sql/expr/tuple.h"
+#include "sql/parser/value.h"
 
 using namespace std;
 
@@ -85,9 +87,15 @@ ComparisonExpr::~ComparisonExpr() {}
 
 RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &result) const
 {
-  RC  rc         = RC::SUCCESS;
-  int cmp_result = left.compare(right);
-  result         = false;
+  RC  rc = RC::SUCCESS;
+  int cmp_result;
+  try {
+    cmp_result = left.compare(right);
+  } catch (bad_cast_exception) {
+    return RC::NULL_VALUE;
+  }
+
+  result = false;
   switch (comp_) {
     case EQUAL_TO: {
       result = (0 == cmp_result);
@@ -126,7 +134,10 @@ RC ComparisonExpr::try_get_value(Value &cell) const
 
     bool value = false;
     RC   rc    = compare_value(left_cell, right_cell, value);
-    if (rc != RC::SUCCESS) {
+    if (rc == RC::NULL_VALUE) {
+      cell.set_null();
+      rc = RC::SUCCESS;
+    } else if (rc != RC::SUCCESS) {
       LOG_WARN("failed to compare tuple cells. rc=%s", strrc(rc));
     } else {
       cell.set_boolean(value);
@@ -158,6 +169,9 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
   rc = compare_value(left_value, right_value, bool_value);
   if (rc == RC::SUCCESS) {
     value.set_boolean(bool_value);
+  } else if (rc == RC::NULL_VALUE) {
+    rc = RC::SUCCESS;
+    value.set_null();
   }
   return rc;
 }
@@ -182,7 +196,13 @@ RC ConjunctionExpr::get_value(const Tuple &tuple, Value &value) const
       LOG_WARN("failed to get value by child expression. rc=%s", strrc(rc));
       return rc;
     }
-    bool bool_value = tmp_value.get_boolean();
+    bool bool_value;
+    try {
+      bool_value = tmp_value.get_boolean();
+    } catch (bad_cast_exception) {
+      value.set_null();
+      return RC::SUCCESS;
+    }
     if ((conjunction_type_ == Type::AND && !bool_value) || (conjunction_type_ == Type::OR && bool_value)) {
       value.set_boolean(bool_value);
       return rc;
@@ -301,7 +321,13 @@ RC ArithmeticExpr::get_value(const Tuple &tuple, Value &value) const
     LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
     return rc;
   }
-  return calc_value(left_value, right_value, value);
+  try {
+    rc = calc_value(left_value, right_value, value);
+  } catch (bad_cast_exception) {
+    value.set_null();
+    rc = RC::SUCCESS;
+  }
+  return rc;
 }
 
 RC ArithmeticExpr::try_get_value(Value &value) const
@@ -324,6 +350,12 @@ RC ArithmeticExpr::try_get_value(Value &value) const
       return rc;
     }
   }
-
-  return calc_value(left_value, right_value, value);
+  
+  try {
+    rc = calc_value(left_value, right_value, value);
+  } catch (bad_cast_exception) {
+    value.set_null();
+    rc = RC::SUCCESS;
+  }
+  return rc;
 }

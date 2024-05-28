@@ -13,8 +13,10 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/operator/table_scan_physical_operator.h"
+#include "common/types.h"
 #include "event/sql_debug.h"
 #include "storage/table/table.h"
+#include "storage/trx/trx.h"
 
 using namespace std;
 
@@ -35,7 +37,13 @@ RC TableScanPhysicalOperator::next()
   bool filter_result = false;
   while (OB_SUCC(rc = record_scanner_.next(current_record_))) {
     LOG_TRACE("got a record. rid=%s", current_record_.rid().to_string().c_str());
-    
+
+    RC rc = trx_->visit_record(table_, current_record_, mode_);
+
+    if (rc == RC::RECORD_INVISIBLE) {
+      continue;
+    }
+
     tuple_.set_record(&current_record_);
     rc = filter(tuple_, filter_result);
     if (rc != RC::SUCCESS) {

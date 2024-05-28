@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include <cassert>
 #include <functional>
 #include <memory>
 #include <sstream>
@@ -25,6 +26,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/comparator.h"
 #include "common/log/log.h"
 #include "sql/parser/parse_defs.h"
+#include "sql/parser/value.h"
 #include "storage/buffer/disk_buffer_pool.h"
 #include "storage/record/record_manager.h"
 #include "storage/index/latch_memo.h"
@@ -67,6 +69,7 @@ public:
   int operator()(const char *v1, const char *v2) const
   {
     switch (attr_type_) {
+      case DATES: 
       case INTS: {
         return common::compare_int((void *)v1, (void *)v2);
       } break;
@@ -75,6 +78,12 @@ public:
       }
       case CHARS: {
         return common::compare_string((void *)v1, attr_length_, (void *)v2, attr_length_);
+      }
+      case TEXTS: {
+        ASSERT(false, "TODO not implemented");
+      }
+      case NULLS: {
+        ASSERT(false, "TODO not implemented");
       }
       default: {
         ASSERT(false, "unknown attr type. %d", attr_type_);

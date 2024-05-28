@@ -174,7 +174,7 @@ private:
 
   bool             dirty_ = false;
   std::atomic<int> pin_count_{0};
-  unsigned long    acc_time_ = 0;
+  unsigned long    acc_time_ = 0;    //访问时间，此字段暂时没有实际作用
   FrameId          frame_id_;
   Page             page_;
 

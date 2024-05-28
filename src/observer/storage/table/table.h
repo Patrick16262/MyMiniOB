@@ -120,7 +120,7 @@ public:
   Index *find_index_by_field(const char *field_name) const;
 
 private:
-  Db                  *db_ = nullptr;
+  Db                  *db_ = nullptr; 
   std::string          base_dir_;
   TableMeta            table_meta_;
   DiskBufferPool      *data_buffer_pool_ = nullptr;  /// 数据文件关联的buffer pool

@@ -44,7 +44,7 @@ public:
 
 private:
   bool             inited_ = false;
-  Table           *table_  = nullptr;
+  Table           *table_  = nullptr; //这个字段暂时没有作用
   BplusTreeHandler index_handler_;
 };
 

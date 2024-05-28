@@ -582,13 +582,11 @@ RC RecordFileHandler::visit_record(const RID &rid, std::function<bool(Record &)>
 RecordFileScanner::~RecordFileScanner() { close_scan(); }
 
 RC RecordFileScanner::open_scan(
-    Table *table, DiskBufferPool &buffer_pool, Trx *trx, LogHandler &log_handler, ReadWriteMode mode, ConditionFilter *condition_filter)
+    Table *, DiskBufferPool &buffer_pool, Trx *, LogHandler &log_handler, ReadWriteMode mode, ConditionFilter *condition_filter)
 {
   close_scan();
 
-  table_            = table;
   disk_buffer_pool_ = &buffer_pool;
-  trx_              = trx;
   log_handler_      = &log_handler;
   rw_mode_          = mode;
 
@@ -667,14 +665,6 @@ RC RecordFileScanner::fetch_next_record_in_page()
       continue;
     }
 
-    // 如果是某个事务上遍历数据，还要看看事务访问是否有冲突
-    if (trx_ == nullptr) {
-      return rc;
-    }
-
-    // 让当前事务探测一下是否访问冲突，或者需要加锁、等锁等操作，由事务自己决定
-    // TODO 把判断事务有效性的逻辑从Scanner中移除
-    rc = trx_->visit_record(table_, next_record_, rw_mode_);
     if (rc == RC::RECORD_INVISIBLE) {
       // 可以参考MvccTrx，表示当前记录不可见
       // 这种模式仅在 readonly 事务下是有效的

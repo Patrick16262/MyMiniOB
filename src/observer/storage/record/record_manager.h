@@ -333,9 +333,9 @@ public:
    * @param buffer_pool      访问的文件
    * @param mode             当前是否只读操作。访问数据时，需要对页面加锁。比如
    *                         删除时也需要遍历找到数据，然后删除，这时就需要加写锁
-   * @param condition_filter 做一些初步过滤操作
+   * @param condition_filter 做一些初步过滤操作，但这个功能目前没有用到
    */
-  RC open_scan(Table *table, DiskBufferPool &buffer_pool, Trx *trx, LogHandler &log_handler, ReadWriteMode mode,
+  RC open_scan(Table *, DiskBufferPool &buffer_pool, Trx *, LogHandler &log_handler, ReadWriteMode mode,
       ConditionFilter *condition_filter);
 
   /**
@@ -364,11 +364,8 @@ private:
   RC fetch_next_record_in_page();
 
 private:
-  // TODO 对于一个纯粹的record遍历器来说，不应该关心表和事务
-  Table *table_ = nullptr;  ///< 当前遍历的是哪张表。这个字段仅供事务函数使用，如果设计合适，可以去掉
 
   DiskBufferPool *disk_buffer_pool_ = nullptr;  ///< 当前访问的文件
-  Trx            *trx_              = nullptr;  ///< 当前是哪个事务在遍历
   LogHandler     *log_handler_      = nullptr;
   ReadWriteMode   rw_mode_ = ReadWriteMode::READ_WRITE;  ///< 遍历出来的数据，是否可能对它做修改
 

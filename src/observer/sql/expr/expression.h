@@ -43,6 +43,8 @@ enum class ExprType
   ARITHMETIC,   ///< 算术运算
 };
 
+
+
 /**
  * @brief 表达式的抽象描述
  * @ingroup Expression
@@ -280,6 +282,9 @@ public:
   std::unique_ptr<Expression> &right() { return right_; }
 
 private:
+  /**
+  * @throw bad_cast_exception 如果存在null导致无法运算
+  */
   RC calc_value(const Value &left_value, const Value &right_value, Value &value) const;
 
 private:

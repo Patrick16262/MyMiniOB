@@ -16,6 +16,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/string.h"
 #include "common/log/log.h"
 #include "common/rc.h"
+#include "sql/parser/value.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 
@@ -123,6 +124,34 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
     FilterObj filter_obj;
     filter_obj.init_value(condition.right_value);
     filter_unit->set_right(filter_obj);
+  }
+
+  //对日期类型进行隐式转换
+  if (filter_unit->left().is_attr && filter_unit->left().field.attr_type() == DATES && !filter_unit->right().is_attr &&
+      filter_unit->right().value.attr_type() == CHARS) {
+    std::string str = filter_unit->right().value.get_string();
+    FilterObj   filter_obj;
+    Value       date;
+    date.set_date(str.c_str());
+    if (date.attr_type() == NULLS) {
+      LOG_WARN("date is invalid");
+      return RC::INVALID_ARGUMENT;
+    }
+    filter_obj.init_value(date);
+    filter_unit->set_right(filter_obj);
+  }
+  if (filter_unit->right().is_attr && filter_unit->right().field.attr_type() == DATES && !filter_unit->left().is_attr &&
+      filter_unit->left().value.attr_type() == CHARS) {
+    std::string str = filter_unit->left().value.get_string();
+    FilterObj   filter_obj;
+    Value       date;
+    date.set_date(str.c_str());
+    if (date.attr_type() == NULLS) {
+      LOG_WARN("date is invalid");
+      return RC::INVALID_ARGUMENT;
+    }
+    filter_obj.init_value(date);
+    filter_unit->set_left(filter_obj);
   }
 
   filter_unit->set_comp(comp);

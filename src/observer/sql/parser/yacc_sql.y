@@ -77,6 +77,9 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         INT_T
         STRING_T
         FLOAT_T
+        DATE_T
+        TEXT_T
+        THE_NULL
         HELP
         EXIT
         DOT //QUOTE
@@ -330,7 +333,7 @@ attr_def:
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
-      $$->length = 4;
+      $$->length = 4;   /*length 默认为4, 这一点和Mysql不一样*/
       free($1);
     }
     ;
@@ -341,7 +344,10 @@ type:
     INT_T      { $$=INTS; }
     | STRING_T { $$=CHARS; }
     | FLOAT_T  { $$=FLOATS; }
+    | TEXT_T   { $$=TEXTS; }
+    | DATE_T   { $$=DATES; }
     ;
+
 insert_stmt:        /*insert   语句的语法解析树*/
     INSERT INTO ID VALUES LBRACE value value_list RBRACE 
     {
@@ -387,6 +393,10 @@ value:
       $$ = new Value(tmp);
       free(tmp);
       free($1);
+    }
+    |THE_NULL {
+      $$ = new Value();
+      $$->set_null();
     }
     ;
     

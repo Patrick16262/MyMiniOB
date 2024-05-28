@@ -14,23 +14,35 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include "common/rc.h"
 #include <string>
 
 /**
  * @brief 属性的类型
  *
  */
+#define ATTR_TYPE_DEFS                                 \
+  ATTR_TYPE_DEF(UNDEFINED)                             \
+  ATTR_TYPE_DEF(CHARS)    /*字符串类型*/          \
+  ATTR_TYPE_DEF(INTS)     /*整数类型(4字节)*/    \
+  ATTR_TYPE_DEF(FLOATS)   /*浮点数类型(4字节)*/ \
+  ATTR_TYPE_DEF(BOOLEANS) /*boolean类型*/            \
+  ATTR_TYPE_DEF(DATES)    /*日期类型*/             \
+  ATTR_TYPE_DEF(TEXTS)    /*长文本类型*/          \
+  ATTR_TYPE_DEF(NULLS)    /*null类型*/
+
 enum AttrType
 {
-  UNDEFINED,
-  CHARS,     ///< 字符串类型
-  INTS,      ///< 整数类型(4字节)
-  FLOATS,    ///< 浮点数类型(4字节)
-  BOOLEANS,  ///< boolean类型，当前不是由parser解析出来的，是程序内部使用的
+#define ATTR_TYPE_DEF(type) type,
+  ATTR_TYPE_DEFS
+#undef ATTR_TYPE_DEF
 };
 
 const char *attr_type_to_string(AttrType type);
 AttrType    attr_type_from_string(const char *s);
+
+class bad_cast_exception
+{};
 
 /**
  * @brief 属性的值
@@ -59,9 +71,13 @@ public:
   void set_boolean(bool val);
   void set_string(const char *s, int len = 0);
   void set_value(const Value &value);
+  void set_date(const char *str);
+  void set_text(const char *str);
+  void set_null();
 
   std::string to_string() const;
 
+  //@throw bad_cast_exception 如果存在null导致无法比较
   int compare(const Value &other) const;
 
   const char *data() const;
@@ -73,11 +89,13 @@ public:
   /**
    * 获取对应的值
    * 如果当前的类型与期望获取的类型不符，就会执行转换操作
+   * @throw bad_cast_exception 如果存在null导致转换失败
    */
   int         get_int() const;
   float       get_float() const;
   std::string get_string() const;
   bool        get_boolean() const;
+  double      get_double() const; // get double value，并非是解析出来的
 
 private:
   AttrType attr_type_ = UNDEFINED;
@@ -91,3 +109,8 @@ private:
   } num_value_;
   std::string str_value_;
 };
+
+
+namespace common {
+  RC try_convert_value(const Value &value, AttrType type, Value &res);
+}

@@ -78,6 +78,12 @@ RC IndexScanPhysicalOperator::next()
       return rc;
     }
 
+    //TODO 瞎改的，这段代码需要检查
+    rc = trx_->visit_record(table_, current_record_, mode_);
+    if (rc == RC::RECORD_INVISIBLE) {
+      continue;
+    }
+
     LOG_TRACE("got a record. rid=%s", rid.to_string().c_str());
 
     tuple_.set_record(&current_record_);

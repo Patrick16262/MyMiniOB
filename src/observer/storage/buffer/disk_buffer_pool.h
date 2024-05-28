@@ -303,7 +303,7 @@ private:
   int32_t           buffer_pool_id_ = -1;
   Frame            *hdr_frame_      = nullptr;  /// 文件头页面
   BPFileHeader     *file_header_    = nullptr;  /// 文件头
-  std::set<PageNum> disposed_pages_;            /// 已经释放的页面
+  std::set<PageNum> disposed_pages_;            /// 这个字段当前没有作用
 
   std::string file_name_;  /// 文件名
 

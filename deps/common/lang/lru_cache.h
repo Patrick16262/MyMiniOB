@@ -19,6 +19,16 @@ See the Mulan PSL v2 for more details. */
 
 namespace common {
 
+  /**
+  * @brief LRU Cache
+  * @details LRU Cache是一种缓存算法，它的核心思想是“最近最少使用”，即最近使用的数据会被保留，而较早之前使用的数据会被淘汰。
+  * LRU Cache通常使用一个双向链表和一个哈希表来实现，双向链表用于存储数据，哈希表用于快速查找数据。
+  * @tparam Key 键类型
+  * @tparam Value 值类型
+  * @tparam Hash 哈希函数类型，默认为std::hash<Key>
+  * @tparam Pred 相等比较函数类型，默认为std::equal_to<Key>
+  */
+
 template <typename Key, typename Value, typename Hash = std::hash<Key>, typename Pred = std::equal_to<Key>>
 class LruCache
 {
