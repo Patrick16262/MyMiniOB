@@ -9,7 +9,7 @@
     {
       "label": "build_debug",
       "type": "shell",
-      "command": "bash build.sh debug --make -j24",
+      "command": "bash build.sh debug --make -j20",
       "problemMatcher": [],
       "group": {
         "kind": "build",
@@ -20,7 +20,12 @@
     {
       "label": "build_release",
       "type": "shell",
-      "command": "bash build.sh release --make -j24"
+      "command": "bash build.sh release --make -j20",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "dependsOn" : "gen_parser"
     },
     {
       "label": "gen_parser",

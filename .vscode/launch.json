@@ -7,7 +7,7 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug",
+            "name": "MiniOB",
             "program": "${workspaceFolder}/${defaultBuildTask}/bin/observer",
             "args": [
                 "-f",
@@ -20,7 +20,7 @@
                 "disk"
             ],
             "cwd": "${workspaceFolder}/${defaultBuildTask}/",
-            "preLaunchTask": "build_debug"
+            "preLaunchTask": "${defaultBuildTask}"
         }
     ]
 }
