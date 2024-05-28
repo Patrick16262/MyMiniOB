@@ -65,6 +65,8 @@ public:
    */
   RC create_table(const char *table_name, std::span<const AttrInfoSqlNode> attributes);
 
+  RC drop_table(const char *table_name);
+
   /**
    * @brief 根据表名查找表
    */

@@ -84,7 +84,7 @@ mt_visible void free(void *ptr)
 
 mt_visible void cfree(void *ptr) { free(ptr); }
 
-mt_visible void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset)
+mt_visible void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) throw()
 {
   MT.init_hook_funcs();
   void *res = orig_mmap(addr, length, prot, flags, fd, offset);
@@ -94,7 +94,7 @@ mt_visible void *mmap(void *addr, size_t length, int prot, int flags, int fd, of
   return res;
 }
 
-mt_visible int munmap(void *addr, size_t length)
+mt_visible int munmap(void *addr, size_t length) throw()
 {
   MT.init_hook_funcs();
   int res = orig_munmap(addr, length);
@@ -128,7 +128,7 @@ mt_visible char *strndup(const char *s, size_t n) MT_THROW
   return t;
 }
 
-mt_visible char *realpath(const char *fname, char *resolved_name)
+mt_visible char *realpath(const char *fname, char *resolved_name) throw()
 {
   MEMTRACER_LOG("realpath not supported\n");
   exit(-1);
@@ -139,7 +139,7 @@ mt_visible void *memalign(size_t alignment, size_t size)
   exit(-1);
 }
 
-mt_visible void *valloc(size_t size)
+mt_visible void *valloc(size_t size) throw()
 {
   MEMTRACER_LOG("valloc not supported\n");
   exit(-1);
@@ -151,25 +151,25 @@ mt_visible void *pvalloc(size_t size)
   exit(-1);
 }
 
-mt_visible int posix_memalign(void **memptr, size_t alignment, size_t size)
+mt_visible int posix_memalign(void **memptr, size_t alignment, size_t size) throw()
 {
   MEMTRACER_LOG("posix_memalign not supported\n");
   exit(-1);
 }
 
-mt_visible int brk(void *addr)
+mt_visible int brk(void *addr) throw()
 {
   MEMTRACER_LOG("brk not supported\n");
   exit(-1);
 }
 
-mt_visible void *sbrk(intptr_t increment)
+mt_visible void *sbrk(intptr_t increment) throw()
 {
   MEMTRACER_LOG("sbrk not supported\n");
   exit(-1);
 }
 
-mt_visible long int syscall(long int __sysno, ...)
+mt_visible long int syscall(long int __sysno, ...) throw()
 {
   MEMTRACER_LOG("syscall not supported\n");
   exit(-1);

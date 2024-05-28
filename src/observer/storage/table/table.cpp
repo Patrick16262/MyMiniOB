@@ -127,6 +127,33 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
   return rc;
 }
 
+RC Table::drop() {
+  // 删除表文件
+  std::string data_file = table_data_file(base_dir_.c_str(), name());
+  if (remove(data_file.c_str()) != 0) {
+    LOG_ERROR("Failed to remove data file. file name=%s, errmsg=%s", data_file.c_str(), strerror(errno));
+    return RC::IOERR_DELETE;
+  }
+
+  // 删除元数据文件
+  std::string meta_file = table_meta_file(base_dir_.c_str(), name());
+  if (remove(meta_file.c_str()) != 0) {
+    LOG_ERROR("Failed to remove meta file. file name=%s, errmsg=%s", meta_file.c_str(), strerror(errno));
+    return RC::IOERR_DELETE;
+  }
+
+  // 删除索引文件
+  for (Index *index : indexes_) {
+    std::string index_file = table_index_file(base_dir_.c_str(), name(), index->index_meta().name());
+    if (remove(index_file.c_str()) != 0) {
+      LOG_ERROR("Failed to remove index file. file name=%s, errmsg=%s", index_file.c_str(), strerror(errno));
+      return RC::IOERR_DELETE;
+    }
+  }
+
+  return RC::SUCCESS;
+}
+
 RC Table::open(Db *db, const char *meta_file, const char *base_dir)
 {
   // 加载元数据文件

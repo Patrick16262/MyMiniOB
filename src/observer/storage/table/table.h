@@ -53,6 +53,7 @@ public:
    */
   RC create(Db *db, int32_t table_id, const char *path, const char *name, const char *base_dir,
       std::span<const AttrInfoSqlNode> attributes);
+  RC drop();
 
   /**
    * 打开一个表

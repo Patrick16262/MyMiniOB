@@ -71,11 +71,11 @@ RC Db::init(const char *name, const char *dbpath, const char *trx_kit_name, cons
   trx_kit_.reset(trx_kit);
 
   buffer_pool_manager_ = make_unique<BufferPoolManager>();
-  auto dblwr_buffer = make_unique<DiskDoubleWriteBuffer>(*buffer_pool_manager_);
+  auto dblwr_buffer    = make_unique<DiskDoubleWriteBuffer>(*buffer_pool_manager_);
 
-  const char *double_write_buffer_filename = "dblwr.db";
+  const char      *double_write_buffer_filename  = "dblwr.db";
   filesystem::path double_write_buffer_file_path = filesystem::path(dbpath) / double_write_buffer_filename;
-  rc = dblwr_buffer->open_file(double_write_buffer_file_path.c_str());
+  rc                                             = dblwr_buffer->open_file(double_write_buffer_file_path.c_str());
   if (OB_FAIL(rc)) {
     LOG_ERROR("Failed to open double write buffer file. file=%s, rc=%s",
               double_write_buffer_file_path.c_str(), strrc(rc));
@@ -88,15 +88,15 @@ RC Db::init(const char *name, const char *dbpath, const char *trx_kit_name, cons
     return rc;
   }
 
-  filesystem::path clog_path = filesystem::path(dbpath) / "clog";
-  LogHandler *tmp_log_handler = nullptr;
-  rc = LogHandler::create(log_handler_name, tmp_log_handler);
+  filesystem::path clog_path       = filesystem::path(dbpath) / "clog";
+  LogHandler      *tmp_log_handler = nullptr;
+  rc                               = LogHandler::create(log_handler_name, tmp_log_handler);
   if (OB_FAIL(rc)) {
     LOG_ERROR("Failed to create log handler: %s", log_handler_name);
     return rc;
   }
   log_handler_.reset(tmp_log_handler);
-  
+
   rc = log_handler_->init(clog_path.c_str());
   if (OB_FAIL(rc)) {
     LOG_WARN("failed to init log handler. dbpath=%s, rc=%s", dbpath, strrc(rc));
@@ -159,6 +159,25 @@ RC Db::create_table(const char *table_name, span<const AttrInfoSqlNode> attribut
 
   opened_tables_[table_name] = table;
   LOG_INFO("Create table success. table name=%s, table_id:%d", table_name, table_id);
+  return RC::SUCCESS;
+}
+
+RC Db::drop_table(const char *table_name) {
+  Table *table = find_table(table_name);
+  if (table == nullptr) {
+    LOG_WARN("no such table. db=%s, table_name=%s", name(), table_name);
+    return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
+
+  RC rc = table->drop();
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("drop table failed. db=%s, table_name=%s, due to %s", name(), table_name, strrc(rc));
+    return rc;
+  }
+
+  opened_tables_.erase(table_name);
+  delete table;
+  LOG_INFO("drop table success. db=%s, table_name=%s", name(), table_name);
   return RC::SUCCESS;
 }
 
@@ -243,7 +262,7 @@ RC Db::sync()
   }
 
   auto dblwr_buffer = static_cast<DiskDoubleWriteBuffer *>(buffer_pool_manager_->get_dblwr_buffer());
-  rc = dblwr_buffer->flush_page();
+  rc                = dblwr_buffer->flush_page();
   LOG_INFO("double write buffer flush pages ret=%s", strrc(rc));
 
   /*
@@ -388,7 +407,7 @@ RC Db::flush_meta()
 RC Db::init_dblwr_buffer()
 {
   auto dblwr_buffer = static_cast<DiskDoubleWriteBuffer *>(buffer_pool_manager_->get_dblwr_buffer());
-  RC rc = dblwr_buffer->recover();
+  RC   rc           = dblwr_buffer->recover();
   if (OB_FAIL(rc)) {
     LOG_ERROR("fail to recover in dblwr buffer");
     return rc;
