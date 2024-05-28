@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 project(minidb)
 
-SET(CMAKE_CXX_COMPILER "clang++")
+
 
 SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
 
@@ -17,7 +17,6 @@ SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
 # print some message
 MESSAGE(STATUS "This is Project source dir " ${PROJECT_SOURCE_DIR})
 MESSAGE(STATUS "This is PROJECT_BINARY_DIR dir " ${PROJECT_BINARY_DIR})
-MESSAGE(STATUS "CMAKE_CXX_COMPILER is " ${CMAKE_CXX_COMPILER})
 MESSAGE(STATUS "HOME dir: $ENV{HOME}")
 
 # ===============
@@ -39,6 +38,14 @@ OPTION(STATIC_STDLIB "Link std library static or dynamic, such as libgcc, libstd
 # ==================
 # === Compiler =====
 # ==================
+
+# DO NOT USE FEATURES THAT ARE NOT SUPPORTED BY GCC IN RELEASE BUILD
+IF (DEBUG)
+    SET(CMAKE_CXX_COMPILER "clang++")
+ENDIF (DEBUG)
+
+MESSAGE(STATUS "CMAKE_CXX_COMPILER is " ${CMAKE_CXX_COMPILER})
+
 IF(WIN32)
     MESSAGE(STATUS "This is windows.")
     ADD_DEFINITIONS(-DWIN32)
