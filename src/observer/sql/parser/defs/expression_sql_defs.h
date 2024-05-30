@@ -1,6 +1,7 @@
 #pragma once
 
 #include "sql/expr/expr_type.h"
+#include "sql/expr/expression.h"
 #include "sql/parser/value.h"
 #include "sql_node_fwd.h"
 #include "comp_op.h"
@@ -79,4 +80,14 @@ class CastExpressionSqlNode : public ExpressionSqlNode
 
   CastExpressionSqlNode() { ExpressionSqlNode::expr_type = ExprType::CAST; }
   ~CastExpressionSqlNode() { delete child; child = nullptr;}
+};
+
+class LikeExpressionSqlNode : public ExpressionSqlNode
+{
+  public:
+  ExpressionSqlNode *child = nullptr;
+  std::string pattern;
+
+  LikeExpressionSqlNode() { ExpressionSqlNode::expr_type = ExprType::LIKE; }
+  ~LikeExpressionSqlNode() { delete child; child = nullptr;}
 };

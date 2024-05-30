@@ -15,12 +15,12 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include "sql/operator/physical_operator.h"
+#include "sql/parser/parse_defs.h"
 #include <memory>
 #include <string>
 
 class SessionEvent;
 class Stmt;
-class ParsedSqlNode;
 
 /**
  * @brief 与SessionEvent类似，也是处理SQL请求的事件，只是用在SQL的不同阶段

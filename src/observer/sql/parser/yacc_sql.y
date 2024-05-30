@@ -81,6 +81,7 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
         DATA
         INFILE
         EXPLAIN
+        LIKE
 
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
@@ -578,6 +579,17 @@ expression:
       tmp->left = $1;
       tmp->right = $3;
       tmp->conjunction_type = ConjunctionType::OR;
+      
+      $$ = tmp;
+      $$->name = (token_name(sql_string, &@$));
+    }
+    | expression LIKE SSS {
+      LikeExpressionSqlNode *tmp = new LikeExpressionSqlNode;
+      tmp->child = $1;
+      char *dupped_str = common::substr($3,1,strlen($3)-2);
+      tmp->pattern = dupped_str;
+      free(dupped_str);
+      free($3);
       
       $$ = tmp;
       $$->name = (token_name(sql_string, &@$));

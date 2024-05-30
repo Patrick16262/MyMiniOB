@@ -17,6 +17,9 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/tuple.h"
 #include "sql/parser/defs/comp_op.h"
 #include "sql/parser/value.h"
+#include <regex>
+#include <sstream>
+#include <utility>
 
 using namespace std;
 
@@ -239,7 +242,8 @@ RC ConjunctionExpr::get_value(const Tuple &tuple, Value &value) const
       value.set_null();
       return RC::SUCCESS;
     }
-    if ((conjunction_type_ == ConjunctionType::AND && !bool_value) || (conjunction_type_ == ConjunctionType::OR && bool_value)) {
+    if ((conjunction_type_ == ConjunctionType::AND && !bool_value) ||
+        (conjunction_type_ == ConjunctionType::OR && bool_value)) {
       value.set_boolean(bool_value);
       return rc;
     }
@@ -391,4 +395,87 @@ RC ArithmeticExpr::try_get_value(Value &value) const
   }
 
   return rc;
+}
+
+LikeExpr::LikeExpr(std::string partten, std::unique_ptr<Expression> child) : child_(std::move(child))
+{
+  stringstream ss;
+  for (char c : partten) {
+    if (special_chars_.find(c) != special_chars_.end()) {
+      ss << "\\" << c;
+    } else if (c == '%') {
+      ss << ".*";
+    } else if (c == '_') {
+      ss << ".";
+    } else {
+      ss << c;
+    }
+  }
+  partten_ = ss.str();
+}
+
+RC LikeExpr::get_value(const Tuple &tuple, Value &value) const
+{
+  Value  child_value;
+  string child_str;
+  bool   bool_value;
+  RC     rc;
+
+  rc = child_->get_value(tuple, child_value);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to get value of child expression. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  try {
+    child_str = child_value.get_string();
+  } catch (bad_cast_exception) {
+    value.set_null();
+    return RC::SUCCESS;
+  }
+
+  rc = match(child_str, bool_value);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to match string. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  value.set_boolean(bool_value);
+  return rc;
+}
+
+RC LikeExpr::try_get_value(Value &value) const
+{
+  Value  child_value;
+  string child_str;
+  bool   bool_value;
+  RC     rc;
+
+  rc = child_->try_get_value(child_value);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to get value of child expression. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  try {
+    child_str = child_value.get_string();
+  } catch (bad_cast_exception) {
+    value.set_null();
+    return RC::SUCCESS;
+  }
+
+  rc = match(child_value.get_string(), bool_value);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to match string. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  value.set_boolean(bool_value);
+  return rc;
+}
+
+RC LikeExpr::match(const std::string &str, bool &value) const
+{
+  value = regex_match(str, partten_);
+  return RC::SUCCESS;
 }

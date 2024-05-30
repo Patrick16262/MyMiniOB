@@ -15,14 +15,18 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include <memory>
+#include <regex>
 #include <string>
+#include <unordered_set>
 
 #include "sql/parser/defs/comp_op.h"
 #include "sql/parser/value.h"
 #include "storage/field/field.h"
 #include "expr_type.h"
+#include "storage/table/table.h"
 
 class Tuple;
+class Table;
 
 /**
  * @defgroup Expression
@@ -258,4 +262,22 @@ private:
   ArithmeticType              arithmetic_type_;
   std::unique_ptr<Expression> left_;
   std::unique_ptr<Expression> right_;
+};
+
+class LikeExpr : public Expression
+{
+public:
+  explicit LikeExpr(std::string partten, std::unique_ptr<Expression> child);
+  virtual ~LikeExpr() = default;
+
+  RC get_value(const Tuple &tuple, Value &value) const override;
+  RC try_get_value(Value &value) const override;
+  RC match(const std::string &str, bool &value) const;
+  ExprType type() const override {return ExprType::LIKE;};
+  AttrType value_type() const override { return BOOLEANS; };
+
+private:
+  std::regex partten_;
+  std::unique_ptr<Expression> child_;
+  const std::unordered_set<char> special_chars_ = {'^', '$', '.', '*', '+', '?', '(', ')', '[', ']', '{', '}', '|', '\\'};
 };

@@ -40,6 +40,9 @@ RC ExpressionGenerator::generate_expression(const ExpressionSqlNode *sql_node, s
     case ExprType::SUBQUERY: {
       return RC::UNIMPLENMENT;
     } break;
+    case ExprType::LIKE: {
+      return generate_expression(static_cast<const LikeExpressionSqlNode *>(sql_node), expr);
+    } break;
     default: {
       return RC::INVALID_ARGUMENT;
     } break;
@@ -233,6 +236,20 @@ RC ExpressionGenerator::generate_expression(const CastExpressionSqlNode *sql_nod
   }
 
   expr.reset(new CastExpr(std::move(child), sql_node->target_type));
+  expr->set_name(sql_node->name);
+  return RC::SUCCESS;
+}
+
+RC ExpressionGenerator::generate_expression(const LikeExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr) {
+  std::unique_ptr<Expression> child;
+
+  RC rc = generate_expression(sql_node->child, child);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("generate child expression failed");
+    return rc;
+  }
+
+  expr.reset(new LikeExpr( sql_node->pattern, std::move(child)));
   expr->set_name(sql_node->name);
   return RC::SUCCESS;
 }

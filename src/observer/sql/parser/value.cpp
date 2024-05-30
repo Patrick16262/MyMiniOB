@@ -384,7 +384,12 @@ float Value::get_float() const
   return 0;
 }
 
-std::string Value::get_string() const { return this->to_string(); }
+std::string Value::get_string() const { 
+  if (attr_type_ == NULLS) {
+    throw bad_cast_exception();
+  }
+  return this->to_string(); 
+}
 
 // 在mysql中 boolean实际为tinyint(1)
 bool Value::get_boolean() const

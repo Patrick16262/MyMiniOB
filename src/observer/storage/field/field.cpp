@@ -17,6 +17,22 @@ See the Mulan PSL v2 for more details. */
 #include "sql/parser/value.h"
 #include "storage/record/record.h"
 
+Field::Field(const Table *table, const FieldMeta *field) : table_(table), field_(field) {}
+
+const Table     *Field::table() const { return table_; }
+
+const FieldMeta *Field::meta() const { return field_; }
+
+AttrType Field::attr_type() const { return field_->type(); }
+
+const char *Field::table_name() const { return table_->name(); }
+
+const char *Field::field_name() const { return field_->name(); }
+
+void Field::set_table(const Table *table) { this->table_ = table; }
+
+void Field::set_field(const FieldMeta *field) { this->field_ = field; }
+
 void Field::set_int(Record &record, int value)
 {
   ASSERT(field_->type() == AttrType::INTS, "could not set int value to a non-int field");

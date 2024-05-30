@@ -20,6 +20,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "common/lang/serializable.h"
 #include "common/rc.h"
+#include "sql/parser/defs/sql_node_fwd.h"
 #include "storage/field/field_meta.h"
 #include "storage/index/index_meta.h"
 
