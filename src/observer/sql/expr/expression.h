@@ -266,6 +266,7 @@ private:
   std::unique_ptr<Expression> right_;
 };
 
+
 class LikeExpr : public Expression
 {
 public:
@@ -283,6 +284,7 @@ private:
   std::unique_ptr<Expression> child_;
   const std::unordered_set<char> special_chars_ = {'^', '$', '.', '*', '+', '?', '(', ')', '[', ']', '{', '}', '|', '\\'};
 };
+
 
 class NotExpr : public Expression
 {

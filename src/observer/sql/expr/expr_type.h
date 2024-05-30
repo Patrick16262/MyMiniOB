@@ -40,7 +40,8 @@ enum class AggregateType
 };
 
 // length、round和date_format。
-
 enum class FunctionType {
-
+  LENGTH,
+  ROUND,
+  DATE_FORMAT
 };

@@ -444,7 +444,8 @@ LikeExpr::LikeExpr(std::string partten, std::unique_ptr<Expression> child) : chi
       ss << c;
     }
   }
-  partten_ = ss.str();
+  //Mysql的Like是大小写不敏感的
+  partten_ = regex(ss.str(), regex_constants::icase);
 }
 
 RC LikeExpr::get_value(const Tuple &tuple, Value &value) const

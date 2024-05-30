@@ -93,13 +93,13 @@ extern int yydebug;
     DATA = 294,                    /* DATA  */
     INFILE = 295,                  /* INFILE  */
     EXPLAIN = 296,                 /* EXPLAIN  */
-    LIKE = 297,                    /* LIKE  */
-    NUMBER = 298,                  /* NUMBER  */
-    FLOAT = 299,                   /* FLOAT  */
-    ID = 300,                      /* ID  */
-    SSS = 301,                     /* SSS  */
-    AND = 302,                     /* AND  */
-    OR = 303,                      /* OR  */
+    NUMBER = 297,                  /* NUMBER  */
+    FLOAT = 298,                   /* FLOAT  */
+    ID = 299,                      /* ID  */
+    SSS = 300,                     /* SSS  */
+    LIKE = 301,                    /* LIKE  */
+    OR = 302,                      /* OR  */
+    AND = 303,                     /* AND  */
     NOT = 304,                     /* NOT  */
     LT = 305,                      /* LT  */
     GT = 306,                      /* GT  */
@@ -120,7 +120,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 88 "yacc_sql.y"
+#line 87 "yacc_sql.y"
 
   ParsedSqlNode *                   sql_node;
   Value *                           value;

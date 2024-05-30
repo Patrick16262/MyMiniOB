@@ -81,7 +81,6 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
         DATA
         INFILE
         EXPLAIN
-        LIKE
 
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
@@ -145,7 +144,10 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
 %type <sql_node>            commands
 %type <booleans>            opt_not
 
-%left AND OR NOT
+%nonassoc LIKE
+%left OR
+%left AND
+%nonassoc NOT
 %left LT GT LE GE EQ NE
 %left ADD SUB
 %left STAR DIV

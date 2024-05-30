@@ -1,0 +1,41 @@
+DROP TABLE fruits;
+CREATE TABLE fruits (id INT , name char(50));
+
+INSERT INTO fruits VALUES (1, 'Apple');
+INSERT INTO fruits VALUES (2, 'Banana');
+INSERT INTO fruits VALUES (3, 'Orange');
+INSERT INTO fruits VALUES (4, 'Strawberry');
+INSERT INTO fruits VALUES (5, 'Pineapple');
+INSERT INTO fruits VALUES (6, 'Grapes');
+INSERT INTO fruits VALUES (7, 'Watermelon');
+INSERT INTO fruits VALUES (8, 'Mango');
+INSERT INTO fruits VALUES (9, 'Kiwi');
+INSERT INTO fruits VALUES (10, 'Peach');
+INSERT INTO fruits VALUES (11, 'Pear');
+INSERT INTO fruits VALUES (12, 'Cherry');
+INSERT INTO fruits VALUES (13, 'Blueberry');
+INSERT INTO fruits VALUES (14, 'Raspberry');
+INSERT INTO fruits VALUES (15, 'Plum');
+INSERT INTO fruits VALUES (16, 'Lemon');
+INSERT INTO fruits VALUES (17, 'Lime');
+INSERT INTO fruits VALUES (18, 'Coconut');
+INSERT INTO fruits VALUES (19, 'Avocado');
+INSERT INTO fruits VALUES (20, 'Pomegranate');
+
+SELECT * FROM fruits WHERE name NOT LIKE 'p%' AND name NOT LIKE '%e';
++----+------------+
+| id | name       |
++----+------------+
+|  2 | Banana     |
+|  4 | Strawberry |
+|  6 | Grapes     |
+|  7 | Watermelon |
+|  8 | Mango      |
+|  9 | Kiwi       |
+| 12 | Cherry     |
+| 13 | Blueberry  |
+| 14 | Raspberry  |
+| 16 | Lemon      |
+| 18 | Coconut    |
+| 19 | Avocado    |
++----+------------+
