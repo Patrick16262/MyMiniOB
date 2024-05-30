@@ -91,3 +91,12 @@ class LikeExpressionSqlNode : public ExpressionSqlNode
   LikeExpressionSqlNode() { ExpressionSqlNode::expr_type = ExprType::LIKE; }
   ~LikeExpressionSqlNode() { delete child; child = nullptr;}
 };
+
+class NotExpressionSqlNode : public ExpressionSqlNode
+{
+  public:
+  ExpressionSqlNode *child = nullptr;
+
+  NotExpressionSqlNode() { ExpressionSqlNode::expr_type = ExprType::NOT; }
+  ~NotExpressionSqlNode() { delete child; child = nullptr;}
+};

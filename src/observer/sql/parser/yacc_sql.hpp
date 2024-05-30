@@ -100,17 +100,18 @@ extern int yydebug;
     SSS = 301,                     /* SSS  */
     AND = 302,                     /* AND  */
     OR = 303,                      /* OR  */
-    LT = 304,                      /* LT  */
-    GT = 305,                      /* GT  */
-    LE = 306,                      /* LE  */
-    GE = 307,                      /* GE  */
-    EQ = 308,                      /* EQ  */
-    NE = 309,                      /* NE  */
-    ADD = 310,                     /* ADD  */
-    SUB = 311,                     /* SUB  */
-    STAR = 312,                    /* STAR  */
-    DIV = 313,                     /* DIV  */
-    UMINUS = 314                   /* UMINUS  */
+    NOT = 304,                     /* NOT  */
+    LT = 305,                      /* LT  */
+    GT = 306,                      /* GT  */
+    LE = 307,                      /* LE  */
+    GE = 308,                      /* GE  */
+    EQ = 309,                      /* EQ  */
+    NE = 310,                      /* NE  */
+    ADD = 311,                     /* ADD  */
+    SUB = 312,                     /* SUB  */
+    STAR = 313,                    /* STAR  */
+    DIV = 314,                     /* DIV  */
+    UMINUS = 315                   /* UMINUS  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -133,9 +134,10 @@ union YYSTYPE
   char *                            string;
   int                               number;
   float                             floats;
+  bool                              booleans;
   ArithmeticType                    math_type;
 
-#line 139 "yacc_sql.hpp"
+#line 141 "yacc_sql.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;

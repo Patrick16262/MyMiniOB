@@ -98,6 +98,7 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
   char *                            string;
   int                               number;
   float                             floats;
+  bool                              booleans;
   ArithmeticType                    math_type;
 }
 
@@ -142,8 +143,9 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
 %type <sql_node>            command_wrapper
 // commands should be a list but I use a single command instead
 %type <sql_node>            commands
+%type <booleans>            opt_not
 
-%left AND OR
+%left AND OR NOT
 %left LT GT LE GE EQ NE
 %left ADD SUB
 %left STAR DIV
@@ -583,14 +585,28 @@ expression:
       $$ = tmp;
       $$->name = (token_name(sql_string, &@$));
     }
-    | expression LIKE SSS {
+    | expression opt_not LIKE SSS {
       LikeExpressionSqlNode *tmp = new LikeExpressionSqlNode;
       tmp->child = $1;
-      char *dupped_str = common::substr($3,1,strlen($3)-2);
+      char *dupped_str = common::substr($4,1,strlen($4)-2);
       tmp->pattern = dupped_str;
       free(dupped_str);
-      free($3);
-      
+      free($4);
+
+      $$ = tmp;
+
+      if ($2) {
+        NotExpressionSqlNode* not_p = new NotExpressionSqlNode;
+        not_p->child = $$;
+        $$ = not_p;
+      }
+
+      $$->name = (token_name(sql_string, &@$));
+    }
+    | NOT expression {
+      NotExpressionSqlNode *tmp = new NotExpressionSqlNode;
+      tmp->child = $2;
+
       $$ = tmp;
       $$->name = (token_name(sql_string, &@$));
     }
@@ -702,6 +718,12 @@ set_variable_stmt:
 opt_semicolon: /*empty*/
     | SEMICOLON
     ;
+
+opt_not: /*empty*/
+    {$$ = false;}
+    | NOT {$$ = true;}
+    ;
+
 %%
 //_____________________________________________________________________
 extern void scan_string(const char *str, yyscan_t scanner);

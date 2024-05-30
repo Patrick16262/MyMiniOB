@@ -13,7 +13,10 @@ enum class ExprType
   COMPARISON,   ///< 需要做比较的表达式
   CONJUNCTION,  ///< 多个表达式使用同一种关系(AND或OR)来联结
   ARITHMETIC,   ///< 算术运算
+  NOT,          ///< NOT取反表达式
   LIKE,         ///< LIKE表达式
+  IN,           ///< IN表达式
+  EXIST,        ///< EXIST表达式
   AGGREGATE,    ///< 聚合函数
   SUBQUERY,     ///< 子查询
 };
@@ -25,4 +28,19 @@ enum class ArithmeticType
   MUL, ///< 乘法
   DIV, ///< 除法
   NEGATIVE,
+};
+
+enum class AggregateType
+{
+  COUNT,
+  SUM,
+  AVG,
+  MAX,
+  MIN
+};
+
+// length、round和date_format。
+
+enum class FunctionType {
+
 };

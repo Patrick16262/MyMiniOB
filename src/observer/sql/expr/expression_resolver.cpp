@@ -9,6 +9,9 @@
 #include "storage/field/field_meta.h"
 #include <memory>
 #include <vector>
+
+using namespace std;
+
 /**
  * @brief 表达式生成器
  * @details 用于根据SQL的表达式节点，生成具体的表达式对象
@@ -40,10 +43,14 @@ RC ExpressionGenerator::generate_expression(const ExpressionSqlNode *sql_node, s
     case ExprType::SUBQUERY: {
       return RC::UNIMPLENMENT;
     } break;
+    case ExprType::NOT: {
+      return generate_expression(static_cast<const NotExpressionSqlNode *>(sql_node), expr);
+    } break;
     case ExprType::LIKE: {
       return generate_expression(static_cast<const LikeExpressionSqlNode *>(sql_node), expr);
     } break;
     default: {
+      LOG_WARN("unknown expression type: %d", static_cast<int>(sql_node->expr_type));
       return RC::INVALID_ARGUMENT;
     } break;
   }
@@ -221,7 +228,7 @@ RC ExpressionGenerator::generate_expression(
   vector<unique_ptr<Expression>> children;
   children.push_back(std::move(left_expr));
   children.push_back(std::move(right_expr));
-  expr.reset(new ConjunctionExpr(ConjunctionType::AND, children));
+  expr.reset(new ConjunctionExpr(sql_node->conjunction_type, children));
   expr->set_name(sql_node->name);
   return RC::SUCCESS;
 }
@@ -250,6 +257,20 @@ RC ExpressionGenerator::generate_expression(const LikeExpressionSqlNode *sql_nod
   }
 
   expr.reset(new LikeExpr( sql_node->pattern, std::move(child)));
+  expr->set_name(sql_node->name);
+  return RC::SUCCESS;
+}
+
+RC ExpressionGenerator::generate_expression(const NotExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr) {
+  unique_ptr<Expression> child;
+
+  RC rc = generate_expression(sql_node->child, child);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("generate child expression failed");
+    return rc;
+  }
+
+  expr.reset(new NotExpr(std::move(child)));
   expr->set_name(sql_node->name);
   return RC::SUCCESS;
 }

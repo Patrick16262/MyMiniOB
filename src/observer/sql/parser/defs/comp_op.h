@@ -15,14 +15,6 @@ enum CompOp
   NO_OP
 };
 
-enum class AggregateType
-{
-  COUNT,
-  SUM,
-  AVG,
-  MAX,
-  MIN
-};
 
 enum class ConjunctionType {
   AND,

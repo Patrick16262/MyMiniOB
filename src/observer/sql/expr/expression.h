@@ -219,6 +219,8 @@ public:
   ExprType type() const override { return ExprType::CONJUNCTION; }
   AttrType value_type() const override { return BOOLEANS; }
   RC       get_value(const Tuple &tuple, Value &value) const override;
+    RC try_get_value(Value &value) const override;
+
 
   ConjunctionType conjunction_type() const { return conjunction_type_; }
 
@@ -280,4 +282,19 @@ private:
   std::regex partten_;
   std::unique_ptr<Expression> child_;
   const std::unordered_set<char> special_chars_ = {'^', '$', '.', '*', '+', '?', '(', ')', '[', ']', '{', '}', '|', '\\'};
+};
+
+class NotExpr : public Expression
+{
+public:
+  explicit NotExpr(std::unique_ptr<Expression> child): child_(std::move(child)) {}
+  virtual ~NotExpr() = default;
+
+  RC get_value(const Tuple &tuple, Value &value) const override;
+  RC try_get_value(Value &value) const override;
+  ExprType type() const override {return ExprType::NOT;}
+  AttrType value_type() const override { return BOOLEANS; }
+
+private:
+  std::unique_ptr<Expression> child_;
 };
