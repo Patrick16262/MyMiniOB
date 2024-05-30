@@ -21,7 +21,6 @@ See the Mulan PSL v2 for more details. */
 #include "common/log/log.h"
 #include "sql/expr/expression.h"
 #include "sql/expr/tuple_cell.h"
-#include "sql/parser/parse.h"
 #include "sql/parser/value.h"
 #include "storage/record/record.h"
 
@@ -212,47 +211,41 @@ class ProjectTuple : public Tuple
 {
 public:
   ProjectTuple() = default;
-  virtual ~ProjectTuple()
-  {
-    for (TupleCellSpec *spec : speces_) {
-      delete spec;
-    }
-    speces_.clear();
-  }
+  virtual ~ProjectTuple() = default;
 
   void set_tuple(Tuple *tuple) { this->tuple_ = tuple; }
 
-  void add_cell_spec(TupleCellSpec *spec) { speces_.push_back(spec); }
-  int  cell_num() const override { return speces_.size(); }
+  void set_project_exprs(std::vector<std::unique_ptr<Expression>> &project_exprs)
+  {
+    project_exprs_.clear();
+    project_exprs_.swap(project_exprs);
+  }
+
+  int  cell_num() const override { return project_exprs_.size(); }
 
   RC cell_at(int index, Value &cell) const override
   {
-    if (index < 0 || index >= static_cast<int>(speces_.size())) {
+    RC rc;
+    if (index < 0 || index >= static_cast<int>(project_exprs_.size())) {
       return RC::INTERNAL;
     }
     if (tuple_ == nullptr) {
       return RC::INTERNAL;
     }
 
-    const TupleCellSpec *spec = speces_[index];
-    return tuple_->find_cell(*spec, cell);
+    const auto &expr = project_exprs_[index];
+    rc = expr->get_value(*tuple_, cell);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("get value failed. rc=%d", rc);
+    }
+    return rc;
   }
 
   RC find_cell(const TupleCellSpec &spec, Value &cell) const override { return tuple_->find_cell(spec, cell); }
 
-#if 0
-  RC cell_spec_at(int index, const TupleCellSpec *&spec) const override
-  {
-    if (index < 0 || index >= static_cast<int>(speces_.size())) {
-      return RC::NOTFOUND;
-    }
-    spec = speces_[index];
-    return RC::SUCCESS;
-  }
-#endif
 private:
-  std::vector<TupleCellSpec *> speces_;
-  Tuple                       *tuple_ = nullptr;
+  std::vector<std::unique_ptr<Expression>> project_exprs_;
+  Tuple                                   *tuple_ = nullptr;
 };
 
 class ExpressionTuple : public Tuple

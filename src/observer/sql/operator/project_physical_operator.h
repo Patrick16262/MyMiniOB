@@ -14,7 +14,10 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include "sql/expr/expression.h"
 #include "sql/operator/physical_operator.h"
+#include <memory>
+#include <vector>
 
 /**
  * @brief 选择/投影物理算子
@@ -23,12 +26,11 @@ See the Mulan PSL v2 for more details. */
 class ProjectPhysicalOperator : public PhysicalOperator
 {
 public:
-  ProjectPhysicalOperator() {}
+  ProjectPhysicalOperator(std::vector<std::unique_ptr<Expression>>& expressions) {
+    tuple_.set_project_exprs(expressions);
+  }
 
   virtual ~ProjectPhysicalOperator() = default;
-
-  void add_expressions(std::vector<std::unique_ptr<Expression>> &&expressions) {}
-  void add_projection(const Table *table, const FieldMeta *field);
 
   PhysicalOperatorType type() const override { return PhysicalOperatorType::PROJECT; }
 

@@ -15,6 +15,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/optimizer/logical_plan_generator.h"
 
 #include <common/log/log.h>
+#include <memory>
+#include <utility>
 
 #include "sql/operator/calc_logical_operator.h"
 #include "sql/operator/delete_logical_operator.h"
@@ -33,6 +35,9 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/insert_stmt.h"
 #include "sql/stmt/select_stmt.h"
 #include "sql/stmt/stmt.h"
+#include "storage/field/field.h"
+#include "storage/field/field_meta.h"
+#include "storage/table/table.h"
 
 using namespace std;
 
@@ -43,31 +48,31 @@ RC LogicalPlanGenerator::create(Stmt *stmt, unique_ptr<LogicalOperator> &logical
     case StmtType::CALC: {
       CalcStmt *calc_stmt = static_cast<CalcStmt *>(stmt);
 
-      rc                  = create_plan(calc_stmt, logical_operator);
+      rc = create_plan(calc_stmt, logical_operator);
     } break;
 
     case StmtType::SELECT: {
       SelectStmt *select_stmt = static_cast<SelectStmt *>(stmt);
 
-      rc                      = create_plan(select_stmt, logical_operator);
+      rc = create_plan(select_stmt, logical_operator);
     } break;
 
     case StmtType::INSERT: {
       InsertStmt *insert_stmt = static_cast<InsertStmt *>(stmt);
 
-      rc                      = create_plan(insert_stmt, logical_operator);
+      rc = create_plan(insert_stmt, logical_operator);
     } break;
 
     case StmtType::DELETE: {
       DeleteStmt *delete_stmt = static_cast<DeleteStmt *>(stmt);
 
-      rc                      = create_plan(delete_stmt, logical_operator);
+      rc = create_plan(delete_stmt, logical_operator);
     } break;
 
     case StmtType::EXPLAIN: {
       ExplainStmt *explain_stmt = static_cast<ExplainStmt *>(stmt);
 
-      rc                        = create_plan(explain_stmt, logical_operator);
+      rc = create_plan(explain_stmt, logical_operator);
     } break;
     default: {
       rc = RC::UNIMPLENMENT;
@@ -84,15 +89,18 @@ RC LogicalPlanGenerator::create_plan(CalcStmt *calc_stmt, std::unique_ptr<Logica
 
 RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
-  unique_ptr<LogicalOperator> table_oper(nullptr);
+  unique_ptr<LogicalOperator> table_oper     = nullptr;
+  unique_ptr<LogicalOperator> predicate_oper = nullptr;
 
-  const std::vector<Table *> &tables     = select_stmt->tables();
-  const std::vector<Field>   &all_fields = select_stmt->query_fields();
+  const std::vector<Table *> &tables      = select_stmt->tables();
+  const auto                 &query_exprs = select_stmt->query_expr_list();
+  RC                          rc;
+
   for (Table *table : tables) {
     std::vector<Field> fields;
-    for (const Field &field : all_fields) {
-      if (0 == strcmp(field.table_name(), table->name())) {
-        fields.push_back(field);
+    for (const Table *table : tables) {
+      for (const FieldMeta &meta : *table->table_meta().field_metas()) {
+        fields.push_back(Field(table, &meta));
       }
     }
 
@@ -107,15 +115,16 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     }
   }
 
-  unique_ptr<LogicalOperator> predicate_oper;
-
-  RC                          rc = create_plan(select_stmt->filter_stmt(), predicate_oper);
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to create predicate logical plan. rc=%s", strrc(rc));
-    return rc;
+  if (select_stmt->filter_stmt()) {
+    rc = create_plan(select_stmt->filter_stmt(), predicate_oper);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to create predicate logical plan. rc=%s", strrc(rc));
+      return rc;
+    }
   }
 
-  unique_ptr<LogicalOperator> project_oper(new ProjectLogicalOperator(all_fields));
+  unique_ptr<LogicalOperator> project_oper(
+      new ProjectLogicalOperator(const_cast<std::vector<std::unique_ptr<Expression>> &>(query_exprs)));
   if (predicate_oper) {
     if (table_oper) {
       predicate_oper->add_child(std::move(table_oper));
@@ -133,31 +142,8 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 
 RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
-  std::vector<unique_ptr<Expression>> cmp_exprs;
-  const std::vector<FilterUnit *>    &filter_units = filter_stmt->filter_units();
-  for (const FilterUnit *filter_unit : filter_units) {
-    const FilterObj &filter_obj_left  = filter_unit->left();
-    const FilterObj &filter_obj_right = filter_unit->right();
+  logical_operator.reset(new PredicateLogicalOperator(std::move(filter_stmt->expression())));
 
-    unique_ptr<Expression> left(filter_obj_left.is_attr
-                                    ? static_cast<Expression *>(new FieldExpr(filter_obj_left.field))
-                                    : static_cast<Expression *>(new ValueExpr(filter_obj_left.value)));
-
-    unique_ptr<Expression> right(filter_obj_right.is_attr
-                                     ? static_cast<Expression *>(new FieldExpr(filter_obj_right.field))
-                                     : static_cast<Expression *>(new ValueExpr(filter_obj_right.value)));
-
-    ComparisonExpr *cmp_expr = new ComparisonExpr(filter_unit->comp(), std::move(left), std::move(right));
-    cmp_exprs.emplace_back(cmp_expr);
-  }
-
-  unique_ptr<PredicateLogicalOperator> predicate_oper;
-  if (!cmp_exprs.empty()) {
-    unique_ptr<ConjunctionExpr> conjunction_expr(new ConjunctionExpr(ConjunctionExpr::Type::AND, cmp_exprs));
-    predicate_oper = unique_ptr<PredicateLogicalOperator>(new PredicateLogicalOperator(std::move(conjunction_expr)));
-  }
-
-  logical_operator = std::move(predicate_oper);
   return RC::SUCCESS;
 }
 
@@ -205,9 +191,9 @@ RC LogicalPlanGenerator::create_plan(ExplainStmt *explain_stmt, unique_ptr<Logic
 {
   unique_ptr<LogicalOperator> child_oper;
 
-  Stmt                       *child_stmt = explain_stmt->child();
+  Stmt *child_stmt = explain_stmt->child();
 
-  RC                          rc = create(child_stmt, child_oper);
+  RC rc = create(child_stmt, child_oper);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to create explain's child operator. rc=%s", strrc(rc));
     return rc;

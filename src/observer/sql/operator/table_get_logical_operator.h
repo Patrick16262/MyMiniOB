@@ -38,7 +38,7 @@ public:
 
 private:
   Table             *table_ = nullptr;
-  std::vector<Field> fields_;
+  std::vector<Field> fields_; ///??这是干什么用的
   ReadWriteMode      mode_ = ReadWriteMode::READ_WRITE;
 
   // 与当前表相关的过滤操作，可以尝试在遍历数据时执行

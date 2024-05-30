@@ -14,10 +14,14 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include <cassert>
+#include <memory>
+#include <string>
 #include <vector>
 
 #include "common/rc.h"
 #include "sql/expr/expression.h"
+#include "sql/expr/expression_resolver.h"
 #include "sql/stmt/stmt.h"
 
 class Db;
@@ -38,11 +42,20 @@ public:
 public:
   static RC create(CalcSqlNode &calc_sql, Stmt *&stmt)
   {
-    CalcStmt *calc_stmt = new CalcStmt();
-    for (Expression *const expr : calc_sql.expressions) {
-      calc_stmt->expressions_.emplace_back(expr);
+    ExpressionGenerator generator;
+    RC                  rc;
+    CalcStmt           *calc_stmt = new CalcStmt();
+
+    for (auto &sql_node : calc_sql.expressions) {
+      unique_ptr<Expression> expr;
+      rc = generator.generate_expression(sql_node, expr);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
+      calc_stmt->tuple_schema_.push_back(expr->name());
+      calc_stmt->expressions_.push_back(std::move(expr));
     }
-    calc_sql.expressions.clear();
+
     stmt = calc_stmt;
     return RC::SUCCESS;
   }
@@ -50,6 +63,9 @@ public:
 public:
   std::vector<std::unique_ptr<Expression>> &expressions() { return expressions_; }
 
+  std::vector<std::string> tuple_schema() const { return tuple_schema_; }
+
 private:
   std::vector<std::unique_ptr<Expression>> expressions_;
+  std::vector<std::string>                tuple_schema_;
 };

@@ -17,6 +17,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/filter_stmt.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
+#include <cassert>
+#include <cstddef>
 
 DeleteStmt::DeleteStmt(Table *table, FilterStmt *filter_stmt) : table_(table), filter_stmt_(filter_stmt) {}
 
@@ -30,30 +32,29 @@ DeleteStmt::~DeleteStmt()
 
 RC DeleteStmt::create(Db *db, const DeleteSqlNode &delete_sql, Stmt *&stmt)
 {
-  const char *table_name = delete_sql.relation_name.c_str();
-  if (nullptr == db || nullptr == table_name) {
-    LOG_WARN("invalid argument. db=%p, table_name=%p", db, table_name);
-    return RC::INVALID_ARGUMENT;
-  }
+  RC          rc = RC::SUCCESS;
+  DeleteStmt *delete_stmt = nullptr;
+  FilterStmt *filter_stmt = nullptr;
 
   // check whether the table exists
-  Table *table = db->find_table(table_name);
+  Table *table = db->find_table(delete_sql.relation_name.c_str());
   if (nullptr == table) {
-    LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+    LOG_WARN("no such table. db=%s, table_name=%s", db->name(), delete_sql.relation_name.c_str());
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
   std::unordered_map<std::string, Table *> table_map;
-  table_map.insert(std::pair<std::string, Table *>(std::string(table_name), table));
+  table_map.insert(std::pair<std::string, Table *>(delete_sql.relation_name, table));
 
-  FilterStmt *filter_stmt = nullptr;
-  RC          rc          = FilterStmt::create(
-      db, table, &table_map, delete_sql.conditions.data(), static_cast<int>(delete_sql.conditions.size()), filter_stmt);
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to create filter statement. rc=%d:%s", rc, strrc(rc));
-    return rc;
+  if (delete_sql.condition) {
+    rc = FilterStmt::create(db, table, table_map, delete_sql.condition, filter_stmt);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to create filter statement. rc=%d:%s", rc, strrc(rc));
+      return rc;
+    }
   }
 
-  stmt = new DeleteStmt(table, filter_stmt);
+  delete_stmt = new DeleteStmt(table, filter_stmt);
+  stmt = delete_stmt;
   return rc;
 }

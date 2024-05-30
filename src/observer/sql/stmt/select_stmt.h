@@ -15,16 +15,18 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "common/rc.h"
+#include "sql/expr/expression.h"
+
 #include "sql/stmt/stmt.h"
-#include "storage/field/field.h"
 
 class FieldMeta;
-class FilterStmt;
 class Db;
 class Table;
+class FilterStmt;
 
 /**
  * @brief 表示select语句
@@ -42,12 +44,16 @@ public:
   static RC create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt);
 
 public:
-  const std::vector<Table *> &tables() const { return tables_; }
-  const std::vector<Field>   &query_fields() const { return query_fields_; }
-  FilterStmt                 *filter_stmt() const { return filter_stmt_; }
+  const std::vector<Table *>                     &tables() const { return query_tables_; }
+  const std::vector<std::unique_ptr<Expression>> &queryExprList() const { return query_expr_list_; }
+
+  std::vector<std::unique_ptr<Expression>> &query_expr_list() { return query_expr_list_; }
+  FilterStmt                               *filter_stmt() const { return filter_stmt_; }
+  const std::vector<std::string>           &tuple_schema() const { return tuple_schema_; }
 
 private:
-  std::vector<Field>   query_fields_;
-  std::vector<Table *> tables_;
-  FilterStmt          *filter_stmt_ = nullptr;
+  std::vector<std::unique_ptr<Expression>> query_expr_list_;
+  std::vector<Table *>                     query_tables_;
+  std::vector<std::string> tuple_schema_;  // query_expr_list_中的资源会被转移，因此需要额外设置tuple_schema字段
+  FilterStmt *filter_stmt_ = nullptr;
 };

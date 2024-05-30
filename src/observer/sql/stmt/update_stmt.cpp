@@ -22,5 +22,5 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
 {
   // TODO
   stmt = nullptr;
-  return RC::INTERNAL;
+    return RC::UNIMPLENMENT;
 }

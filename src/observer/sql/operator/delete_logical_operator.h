@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/logical_operator.h"
 
 /**
+ * delete operator下必须为可以产生rowTuple的operator 
  * @brief 逻辑算子，用于执行delete语句
  * @ingroup LogicalOperator
  */

@@ -42,6 +42,9 @@ OPTION(STATIC_STDLIB "Link std library static or dynamic, such as libgcc, libstd
 # DO NOT USE FEATURES THAT ARE NOT SUPPORTED BY GCC IN RELEASE BUILD
 IF (DEBUG)
     SET(CMAKE_CXX_COMPILER "clang++")
+    SET(CMAKE_C_COMPILER "clang")
+    MESSAGE(WARNING "Use clang++ as compiler, because of the debug mode")
+    MESSAGE(WARNING "Do not use features that are not supported by GCC in release build")
 ENDIF (DEBUG)
 
 MESSAGE(STATUS "CMAKE_CXX_COMPILER is " ${CMAKE_CXX_COMPILER})
@@ -67,6 +70,7 @@ ENDIF(WIN32)
 SET(CMAKE_COMMON_FLAGS "${CMAKE_COMMON_FLAGS} -Wall") #no Werror=all!
 add_compile_options(-Werror=unused-variable)
 add_compile_options(-Werror=uninitialized)
+add_compile_options(-Werror=return-type)
 IF (ENABLE_NOPIE)
     SET(CMAKE_COMMON_FLAGS "${CMAKE_COMMON_FLAGS} -no-pie")
     ADD_LINK_OPTIONS(-no-pie)
@@ -78,6 +82,7 @@ ENDIF (ENABLE_NOPIE)
 
 IF(DEBUG)
     MESSAGE(STATUS "DEBUG has been set as TRUE ${DEBUG}")
+    add_definitions(-DSHOW_HIDDEN_FIELDS)
     SET(CMAKE_COMMON_FLAGS "${CMAKE_COMMON_FLAGS}  -O0 -g -DDEBUG ")
     ADD_DEFINITIONS(-DENABLE_DEBUG)
 ELSEIF(NOT DEFINED ENV{DEBUG})
@@ -90,6 +95,9 @@ ELSE()
     ADD_DEFINITIONS(-DENABLE_DEBUG)
 ENDIF(DEBUG)
 
+# ===================
+# === Concurrency ===
+# ===================
 
 IF (CONCURRENCY)
     MESSAGE(STATUS "CONCURRENCY is ON")

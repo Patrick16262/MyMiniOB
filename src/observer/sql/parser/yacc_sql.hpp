@@ -87,24 +87,29 @@ extern int yydebug;
     VALUES = 288,                  /* VALUES  */
     FROM = 289,                    /* FROM  */
     WHERE = 290,                   /* WHERE  */
-    AND = 291,                     /* AND  */
-    SET = 292,                     /* SET  */
-    ON = 293,                      /* ON  */
-    LOAD = 294,                    /* LOAD  */
-    DATA = 295,                    /* DATA  */
-    INFILE = 296,                  /* INFILE  */
-    EXPLAIN = 297,                 /* EXPLAIN  */
-    EQ = 298,                      /* EQ  */
-    LT = 299,                      /* LT  */
-    GT = 300,                      /* GT  */
-    LE = 301,                      /* LE  */
-    GE = 302,                      /* GE  */
-    NE = 303,                      /* NE  */
-    NUMBER = 304,                  /* NUMBER  */
-    FLOAT = 305,                   /* FLOAT  */
-    ID = 306,                      /* ID  */
-    SSS = 307,                     /* SSS  */
-    UMINUS = 308                   /* UMINUS  */
+    SET = 291,                     /* SET  */
+    ON = 292,                      /* ON  */
+    LOAD = 293,                    /* LOAD  */
+    DATA = 294,                    /* DATA  */
+    INFILE = 295,                  /* INFILE  */
+    EXPLAIN = 296,                 /* EXPLAIN  */
+    NUMBER = 297,                  /* NUMBER  */
+    FLOAT = 298,                   /* FLOAT  */
+    ID = 299,                      /* ID  */
+    SSS = 300,                     /* SSS  */
+    AND = 301,                     /* AND  */
+    OR = 302,                      /* OR  */
+    LT = 303,                      /* LT  */
+    GT = 304,                      /* GT  */
+    LE = 305,                      /* LE  */
+    GE = 306,                      /* GE  */
+    EQ = 307,                      /* EQ  */
+    NE = 308,                      /* NE  */
+    ADD = 309,                     /* ADD  */
+    SUB = 310,                     /* SUB  */
+    STAR = 311,                    /* STAR  */
+    DIV = 312,                     /* DIV  */
+    UMINUS = 313                   /* UMINUS  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -113,26 +118,23 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 105 "yacc_sql.y"
+#line 87 "yacc_sql.y"
 
   ParsedSqlNode *                   sql_node;
-  ConditionSqlNode *                condition;
   Value *                           value;
-  enum CompOp                       comp;
   RelAttrSqlNode *                  rel_attr;
   std::vector<AttrInfoSqlNode> *    attr_infos;
   AttrInfoSqlNode *                 attr_info;
-  Expression *                      expression;
-  std::vector<Expression *> *       expression_list;
+  ExpressionSqlNode *               expression;
+  std::vector<ExpressionSqlNode *> *expression_list;
   std::vector<Value> *              value_list;
-  std::vector<ConditionSqlNode> *   condition_list;
-  std::vector<RelAttrSqlNode> *     rel_attr_list;
   std::vector<std::string> *        relation_list;
   char *                            string;
   int                               number;
   float                             floats;
+  ArithmeticType                    math_type;
 
-#line 136 "yacc_sql.hpp"
+#line 138 "yacc_sql.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;

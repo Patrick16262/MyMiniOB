@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/expression.h"
 #include "common/rc.h"
 #include "sql/expr/tuple.h"
+#include "sql/parser/defs/comp_op.h"
 #include "sql/parser/value.h"
 
 using namespace std;
@@ -44,16 +45,42 @@ RC CastExpr::cast(const Value &value, Value &cast_value) const
     return rc;
   }
 
-  switch (cast_type_) {
-    case BOOLEANS: {
-      bool val = value.get_boolean();
-      cast_value.set_boolean(val);
-    } break;
-    default: {
-      rc = RC::INTERNAL;
-      LOG_WARN("unsupported convert from type %d to %d", child_->value_type(), cast_type_);
+  try {
+    switch (cast_type_) {
+      case BOOLEANS: {
+        bool val = value.get_boolean();
+        cast_value.set_boolean(val);
+      } break;
+      case DATES: {
+        string val = value.get_string();
+        cast_value.set_date(val.c_str());
+      } break;
+      case FLOATS: {
+        cast_value.set_float(value.get_float());
+      } break;
+      case INTS: {
+        cast_value.set_int(value.get_int());
+      } break;
+      case NULLS: {
+        cast_value.set_null();
+      } break;
+      case CHARS: {
+        string val = value.get_string();
+        cast_value.set_string(val.c_str());
+      }
+      case TEXTS: {
+        string val = value.get_string();
+        cast_value.set_text(val.c_str());
+      } break;
+      default: {
+        throw bad_cast_exception();
+      }
     }
+  } catch (bad_cast_exception) {
+    rc = RC::SUCCESS;
+    cast_value.set_null();
   }
+
   return rc;
 }
 
@@ -126,26 +153,35 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
 
 RC ComparisonExpr::try_get_value(Value &cell) const
 {
-  if (left_->type() == ExprType::VALUE && right_->type() == ExprType::VALUE) {
-    ValueExpr   *left_value_expr  = static_cast<ValueExpr *>(left_.get());
-    ValueExpr   *right_value_expr = static_cast<ValueExpr *>(right_.get());
-    const Value &left_cell        = left_value_expr->get_value();
-    const Value &right_cell       = right_value_expr->get_value();
+  ValueExpr *left_value_expr  = static_cast<ValueExpr *>(left_.get());
+  ValueExpr *right_value_expr = static_cast<ValueExpr *>(right_.get());
+  Value      left_cell;
+  Value      right_cell;
+  RC         rc;
 
-    bool value = false;
-    RC   rc    = compare_value(left_cell, right_cell, value);
-    if (rc == RC::NULL_VALUE) {
-      cell.set_null();
-      rc = RC::SUCCESS;
-    } else if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to compare tuple cells. rc=%s", strrc(rc));
-    } else {
-      cell.set_boolean(value);
-    }
+  rc = left_value_expr->try_get_value(left_cell);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
     return rc;
   }
 
-  return RC::INVALID_ARGUMENT;
+  rc = right_value_expr->try_get_value(right_cell);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  bool value = false;
+  rc         = compare_value(left_cell, right_cell, value);
+  if (rc == RC::NULL_VALUE) {
+    cell.set_null();
+    rc = RC::SUCCESS;
+  } else if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to compare tuple cells. rc=%s", strrc(rc));
+  } else {
+    cell.set_boolean(value);
+  }
+  return rc;
 }
 
 RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
@@ -177,7 +213,7 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-ConjunctionExpr::ConjunctionExpr(Type type, vector<unique_ptr<Expression>> &children)
+ConjunctionExpr::ConjunctionExpr(ConjunctionType type, vector<unique_ptr<Expression>> &children)
     : conjunction_type_(type), children_(std::move(children))
 {}
 
@@ -203,23 +239,23 @@ RC ConjunctionExpr::get_value(const Tuple &tuple, Value &value) const
       value.set_null();
       return RC::SUCCESS;
     }
-    if ((conjunction_type_ == Type::AND && !bool_value) || (conjunction_type_ == Type::OR && bool_value)) {
+    if ((conjunction_type_ == ConjunctionType::AND && !bool_value) || (conjunction_type_ == ConjunctionType::OR && bool_value)) {
       value.set_boolean(bool_value);
       return rc;
     }
   }
 
-  bool default_value = (conjunction_type_ == Type::AND);
+  bool default_value = (conjunction_type_ == ConjunctionType::AND);
   value.set_boolean(default_value);
   return rc;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-ArithmeticExpr::ArithmeticExpr(ArithmeticExpr::Type type, Expression *left, Expression *right)
+ArithmeticExpr::ArithmeticExpr(ArithmeticType type, Expression *left, Expression *right)
     : arithmetic_type_(type), left_(left), right_(right)
 {}
-ArithmeticExpr::ArithmeticExpr(ArithmeticExpr::Type type, unique_ptr<Expression> left, unique_ptr<Expression> right)
+ArithmeticExpr::ArithmeticExpr(ArithmeticType type, unique_ptr<Expression> left, unique_ptr<Expression> right)
     : arithmetic_type_(type), left_(std::move(left)), right_(std::move(right))
 {}
 
@@ -230,7 +266,7 @@ AttrType ArithmeticExpr::value_type() const
   }
 
   if (left_->value_type() == AttrType::INTS && right_->value_type() == AttrType::INTS &&
-      arithmetic_type_ != Type::DIV) {
+      arithmetic_type_ != ArithmeticType::DIV) {
     return AttrType::INTS;
   }
 
@@ -244,7 +280,7 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
   const AttrType target_type = value_type();
 
   switch (arithmetic_type_) {
-    case Type::ADD: {
+    case ArithmeticType::ADD: {
       if (target_type == AttrType::INTS) {
         value.set_int(left_value.get_int() + right_value.get_int());
       } else {
@@ -252,7 +288,7 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
       }
     } break;
 
-    case Type::SUB: {
+    case ArithmeticType::SUB: {
       if (target_type == AttrType::INTS) {
         value.set_int(left_value.get_int() - right_value.get_int());
       } else {
@@ -260,7 +296,7 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
       }
     } break;
 
-    case Type::MUL: {
+    case ArithmeticType::MUL: {
       if (target_type == AttrType::INTS) {
         value.set_int(left_value.get_int() * right_value.get_int());
       } else {
@@ -268,27 +304,23 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
       }
     } break;
 
-    case Type::DIV: {
+    case ArithmeticType::DIV: {
       if (target_type == AttrType::INTS) {
         if (right_value.get_int() == 0) {
-          // NOTE:
-          // 设置为整数最大值是不正确的。通常的做法是设置为NULL，但是当前的miniob没有NULL概念，所以这里设置为整数最大值。
-          value.set_int(numeric_limits<int>::max());
+          value.set_null();
         } else {
           value.set_int(left_value.get_int() / right_value.get_int());
         }
       } else {
         if (right_value.get_float() > -EPSILON && right_value.get_float() < EPSILON) {
-          // NOTE:
-          // 设置为浮点数最大值是不正确的。通常的做法是设置为NULL，但是当前的miniob没有NULL概念，所以这里设置为浮点数最大值。
-          value.set_float(numeric_limits<float>::max());
+          value.set_null();
         } else {
           value.set_float(left_value.get_float() / right_value.get_float());
         }
       }
     } break;
 
-    case Type::NEGATIVE: {
+    case ArithmeticType::NEGATIVE: {
       if (target_type == AttrType::INTS) {
         value.set_int(-left_value.get_int());
       } else {
@@ -350,12 +382,13 @@ RC ArithmeticExpr::try_get_value(Value &value) const
       return rc;
     }
   }
-  
+
   try {
     rc = calc_value(left_value, right_value, value);
   } catch (bad_cast_exception) {
     value.set_null();
     rc = RC::SUCCESS;
   }
+
   return rc;
 }
