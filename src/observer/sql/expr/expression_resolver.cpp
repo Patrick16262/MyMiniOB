@@ -7,8 +7,11 @@
 #include "sql/parser/defs/sql_node_fwd.h"
 #include "sql/parser/value.h"
 #include "storage/field/field_meta.h"
+#include <map>
 #include <memory>
+#include <sstream>
 #include <vector>
+#include "sql/expr/function.h"
 
 using namespace std;
 
@@ -42,6 +45,9 @@ RC ExpressionGenerator::generate_expression(const ExpressionSqlNode *sql_node, s
     } break;
     case ExprType::SUBQUERY: {
       return RC::UNIMPLENMENT;
+    } break;
+    case ExprType::FUNCTION: {
+      return generate_expression(static_cast<const FunctionExpressionSqlNode *>(sql_node), expr);
     } break;
     case ExprType::NOT: {
       return generate_expression(static_cast<const NotExpressionSqlNode *>(sql_node), expr);
@@ -155,7 +161,6 @@ RC ExpressionGenerator::generate_expression(
   std::unique_ptr<Expression> right_expr;
   std::unique_ptr<Expression> cast_expr;
 
-
   RC rc = generate_expression(sql_node->left, left_expr);
   if (rc != RC::SUCCESS) {
     LOG_WARN("generate left expression failed");
@@ -168,31 +173,31 @@ RC ExpressionGenerator::generate_expression(
     return rc;
   }
 
-  //对日期类型字符串进行隐式转换
-  //这里实现的和mysql有点不一样
-  //在mysql中，如果日期格式不正确，会将其转换为float类型，这里直接报错
-  //只有date的值不合法时mysql才会报错
-  if (left_expr->value_type() == AttrType::DATES && 
-  (right_expr->value_type() == AttrType::CHARS || right_expr->value_type() == AttrType::TEXTS)) {
-     cast_expr.reset(new CastExpr(std::move(right_expr), AttrType::DATES));
-     Value test_value;
-     rc = cast_expr->try_get_value(test_value);
-     if (rc == RC::SUCCESS && test_value.attr_type() == AttrType::NULLS) {
-        LOG_WARN("Incorrect DATE value");
-        return RC::INCORRECT_DATE_VALUE;
-     }
+  // 对日期类型字符串进行隐式转换
+  // 这里实现的和mysql有点不一样
+  // 在mysql中，如果日期格式不正确，会将其转换为float类型，这里直接报错
+  // 只有date的值不合法时mysql才会报错
+  if (left_expr->value_type() == AttrType::DATES &&
+      (right_expr->value_type() == AttrType::CHARS || right_expr->value_type() == AttrType::TEXTS)) {
+    cast_expr.reset(new CastExpr(std::move(right_expr), AttrType::DATES));
+    Value test_value;
+    rc = cast_expr->try_get_value(test_value);
+    if (rc == RC::SUCCESS && test_value.attr_type() == AttrType::NULLS) {
+      LOG_WARN("Incorrect DATE value");
+      return RC::INCORRECT_DATE_VALUE;
+    }
 
-     right_expr = std::move(cast_expr);
+    right_expr = std::move(cast_expr);
   }
 
   if (right_expr->value_type() == AttrType::DATES &&
-  (left_expr->value_type() == AttrType::CHARS || left_expr->value_type() == AttrType::TEXTS)) {
+      (left_expr->value_type() == AttrType::CHARS || left_expr->value_type() == AttrType::TEXTS)) {
     cast_expr.reset(new CastExpr(std::move(left_expr), AttrType::DATES));
     Value test_value;
     rc = cast_expr->try_get_value(test_value);
     if (rc == RC::SUCCESS && test_value.attr_type() == AttrType::NULLS) {
-       LOG_WARN("Incorrect DATE value");
-       return RC::INCORRECT_DATE_VALUE;
+      LOG_WARN("Incorrect DATE value");
+      return RC::INCORRECT_DATE_VALUE;
     }
 
     left_expr = std::move(cast_expr);
@@ -233,9 +238,10 @@ RC ExpressionGenerator::generate_expression(
   return RC::SUCCESS;
 }
 
-RC ExpressionGenerator::generate_expression(const CastExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr) {
+RC ExpressionGenerator::generate_expression(const CastExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr)
+{
   std::unique_ptr<Expression> child;
-  
+
   RC rc = generate_expression(sql_node->child, child);
   if (rc != RC::SUCCESS) {
     LOG_WARN("generate child expression failed");
@@ -247,7 +253,8 @@ RC ExpressionGenerator::generate_expression(const CastExpressionSqlNode *sql_nod
   return RC::SUCCESS;
 }
 
-RC ExpressionGenerator::generate_expression(const LikeExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr) {
+RC ExpressionGenerator::generate_expression(const LikeExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr)
+{
   std::unique_ptr<Expression> child;
 
   RC rc = generate_expression(sql_node->child, child);
@@ -256,12 +263,13 @@ RC ExpressionGenerator::generate_expression(const LikeExpressionSqlNode *sql_nod
     return rc;
   }
 
-  expr.reset(new LikeExpr( sql_node->pattern, std::move(child)));
+  expr.reset(new LikeExpr(sql_node->pattern, std::move(child)));
   expr->set_name(sql_node->name);
   return RC::SUCCESS;
 }
 
-RC ExpressionGenerator::generate_expression(const NotExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr) {
+RC ExpressionGenerator::generate_expression(const NotExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr)
+{
   unique_ptr<Expression> child;
 
   RC rc = generate_expression(sql_node->child, child);
@@ -271,6 +279,54 @@ RC ExpressionGenerator::generate_expression(const NotExpressionSqlNode *sql_node
   }
 
   expr.reset(new NotExpr(std::move(child)));
+  expr->set_name(sql_node->name);
+  return RC::SUCCESS;
+}
+
+RC ExpressionGenerator::generate_expression(
+    const FunctionExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr)
+{
+  vector<unique_ptr<Expression>>   param_exprs;
+  static map<string, FunctionType> function_name_map{
+      {"length", FunctionType::LENGTH}, {"round", FunctionType::ROUND}, {"date_format", FunctionType::DATE_FORMAT}};
+
+  for (auto *param : sql_node->param_exprs) {
+    unique_ptr<Expression> param_expr;
+    RC                     rc = generate_expression(param, param_expr);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("generate param expression failed");
+      return rc;
+    }
+    param_exprs.push_back(std::move(param_expr));
+  }
+
+  stringstream lower_case_name;
+  for (auto c : sql_node->function_name) {
+    lower_case_name << static_cast<char>(tolower(c));
+  }
+
+  auto it = function_name_map.find(lower_case_name.str());
+  if (it == function_name_map.end()) {
+    LOG_WARN("unknown function name: %s", sql_node->function_name.c_str());
+    return RC::INVALID_FUNCTION_NAME;
+  }
+
+  switch (it->second) {
+    case FunctionType::LENGTH: {
+      expr.reset(new LengthFunction(param_exprs));
+    } break;
+    case FunctionType::ROUND: {
+      expr.reset(new RoundFunction(param_exprs));
+    } break;
+    case FunctionType::DATE_FORMAT: {
+      expr.reset(new DateFormatFunction(param_exprs));
+    } break;
+    default: {
+      LOG_WARN("unknown function type: %d", static_cast<int>(it->second));
+      return RC::UNIMPLENMENT;
+    } break;
+  }
+
   expr->set_name(sql_node->name);
   return RC::SUCCESS;
 }
@@ -344,7 +400,7 @@ RC QueryListGenerator::wildcard_fields(
     for (auto &table_pair : query_tables_) {
       for (auto &field : *table_pair.second->table_meta().field_metas()) {
 #ifndef SHOW_HIDDEN_FIELDS
-        if (!field.visible()) { 
+        if (!field.visible()) {
           continue;
         }
 #endif

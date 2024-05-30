@@ -13,6 +13,7 @@ enum class ExprType
   COMPARISON,   ///< 需要做比较的表达式
   CONJUNCTION,  ///< 多个表达式使用同一种关系(AND或OR)来联结
   ARITHMETIC,   ///< 算术运算
+  FUNCTION,     ///< 函数表达式
   NOT,          ///< NOT取反表达式
   LIKE,         ///< LIKE表达式
   IN,           ///< IN表达式
@@ -40,7 +41,8 @@ enum class AggregateType
 };
 
 // length、round和date_format。
-enum class FunctionType {
+enum class FunctionType
+{
   LENGTH,
   ROUND,
   DATE_FORMAT

@@ -612,6 +612,14 @@ expression:
       $$ = tmp;
       $$->name = (token_name(sql_string, &@$));
     }
+    | ID LBRACE expression_list RBRACE {
+      FunctionExpressionSqlNode *tmp = new FunctionExpressionSqlNode;
+      tmp->param_exprs.swap(*$3);
+      tmp->function_name = $1;
+
+      $$ = tmp;
+      $$->name = (token_name(sql_string, &@$));
+    }
     | value {
       ValueExpressionSqlNode *tmp = new ValueExpressionSqlNode;
       tmp->value = *$1;

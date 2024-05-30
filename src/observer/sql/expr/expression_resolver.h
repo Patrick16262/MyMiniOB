@@ -29,6 +29,7 @@ public:
   RC generate_expression(const CastExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr);
   RC generate_expression(const LikeExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr);
   RC generate_expression(const NotExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr);
+  RC generate_expression(const FunctionExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr);
 
 private:
   Table                              *default_table_ = nullptr;
