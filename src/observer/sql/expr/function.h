@@ -6,23 +6,22 @@
 #include <string>
 #include <vector>
 
-
-
 class FunctionExpression : public Expression
 {
 public:
   FunctionExpression(std::vector<std::unique_ptr<Expression>> &param_exprs) : param_exprs_(std::move(param_exprs)) {}
   virtual ~FunctionExpression() = default;
-  RC       get_value(const Tuple &tuple, Value &value) const override;
-  RC       try_get_value(Value &value) const override;
-  ExprType type() const override { return ExprType::FUNCTION; };
+  RC                get_value(const Tuple &tuple, Value &value) const override;
+  RC                try_get_value(Value &value) const override;
+  ExprType          type() const override { return ExprType::FUNCTION; };
 
 public:
   virtual AttrType     value_type() const override                                   = 0;
   virtual FunctionType function_type() const                                         = 0;
   virtual RC           function_body(std::vector<Value> params, Value &result) const = 0;
+  virtual RC           check_params() const                                          = 0;
 
-private:
+protected:
   std::vector<std::unique_ptr<Expression>> param_exprs_;
 };
 
@@ -34,6 +33,7 @@ public:
   AttrType     value_type() const override { return AttrType::INTS; }
   FunctionType function_type() const override { return FunctionType::LENGTH; }
   RC           function_body(std::vector<Value> params, Value &result) const override;
+  RC           check_params() const override;
 };
 
 class RoundFunction : public FunctionExpression
@@ -44,6 +44,7 @@ public:
   AttrType     value_type() const override { return AttrType::FLOATS; }
   FunctionType function_type() const override { return FunctionType::ROUND; }
   RC           function_body(std::vector<Value> params, Value &result) const override;
+  RC           check_params() const override;
 
 private:
   float do_round(float num, int precision = 0) const;
@@ -57,6 +58,7 @@ public:
   AttrType     value_type() const override { return AttrType::CHARS; }
   FunctionType function_type() const override { return FunctionType::DATE_FORMAT; }
   RC           function_body(std::vector<Value> params, Value &result) const override;
+  RC           check_params() const override;
 
 private:
   RC do_date_format(int year, int month, int day, const std::string &format, std::string &result) const;
@@ -64,8 +66,8 @@ private:
 
 namespace format {
 inline bool is_luner_year(int year);
-inline int day_of_year(int year, int month, int day);
-inline int day_of_week(int year, int month, int day);
+inline int  day_of_year(int year, int month, int day);
+inline int  day_of_week(int year, int month, int day);
 
 //%a Abbreviated weekday name (Sun..Sat)
 inline std::string get_abbreviated_weekday_name(int year, int month, int day);

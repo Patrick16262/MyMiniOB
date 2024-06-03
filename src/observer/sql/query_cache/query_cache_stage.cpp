@@ -12,17 +12,10 @@ See the Mulan PSL v2 for more details. */
 // Created by Longda on 2021/4/13.
 //
 
-#include <string.h>
-#include <string>
+
 
 #include "query_cache_stage.h"
 
-#include "common/conf/ini.h"
-#include "common/io/io.h"
-#include "common/lang/string.h"
-#include "common/log/log.h"
-
-using namespace common;
 
 RC QueryCacheStage::handle_request(SQLStageEvent *sql_event)
 {

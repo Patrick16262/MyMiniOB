@@ -43,8 +43,8 @@ OPTION(STATIC_STDLIB "Link std library static or dynamic, such as libgcc, libstd
 IF (DEBUG)
     SET(CMAKE_CXX_COMPILER "clang++")
     SET(CMAKE_C_COMPILER "clang")
-    MESSAGE(WARNING "Use clang++ as compiler, because of the debug mode")
-    MESSAGE(WARNING "Do not use features that are not supported by GCC in release build")
+    MESSAGE(WARNING "Use clang++ as compiler")
+    MESSAGE(WARNING "Do not use features only supported by clang")
 ENDIF (DEBUG)
 
 MESSAGE(STATUS "CMAKE_CXX_COMPILER is " ${CMAKE_CXX_COMPILER})

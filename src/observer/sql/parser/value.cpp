@@ -16,8 +16,10 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/comparator.h"
 #include "common/lang/string.h"
 #include "common/log/log.h"
+#include "readline.h"
 #include "sql/parser/parse_defs.h"
 #include <cassert>
+#include <cstdlib>
 #include <ranges>
 #include <sstream>
 #include <string>
@@ -55,6 +57,18 @@ Value::Value(float val) { set_float(val); }
 Value::Value(bool val) { set_boolean(val); }
 
 Value::Value(const char *s, int len /*= 0*/) { set_string(s, len); }
+
+bool Value::operator==(const Value &other) const
+{
+  if (attr_type_ == NULLS && other.attr_type_ == NULLS) {
+    return true;
+  }
+  try {
+    return compare(other) == 0;
+  } catch (bad_cast_exception) {
+    return false;
+  }
+}
 
 void Value::set_data(char *data, int length)
 {
@@ -282,11 +296,10 @@ std::string Value::to_string() const
   return os.str();
 }
 
-// todo: compare data and null
 int Value::compare(const Value &other) const
 {
-  Value  tmp;
-  
+  Value tmp;
+
   double first;
   double second;
 
@@ -300,6 +313,9 @@ int Value::compare(const Value &other) const
     tmp.set_date(str.c_str());
     first  = static_cast<double>(tmp.get_int());
     second = static_cast<double>(other.get_int());
+  } else if ((attr_type_ == AttrType::CHARS || attr_type_ == AttrType::TEXTS) &&
+             (other.attr_type_ == AttrType::CHARS || other.attr_type_ == AttrType::TEXTS)) {
+    return str_value_.compare(other.str_value_);
   } else {
     first  = get_double();
     second = other.get_double();
@@ -384,11 +400,12 @@ float Value::get_float() const
   return 0;
 }
 
-std::string Value::get_string() const { 
+std::string Value::get_string() const
+{
   if (attr_type_ == NULLS) {
     throw bad_cast_exception();
   }
-  return this->to_string(); 
+  return this->to_string();
 }
 
 // 在mysql中 boolean实际为tinyint(1)

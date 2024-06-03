@@ -14,55 +14,57 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/stmt/select_stmt.h"
 #include "common/log/log.h"
+#include "sql/expr/expr_type.h"
 #include "sql/expr/expression.h"
 #include "sql/expr/expression_resolver.h"
+#include "sql/expr/tuple_cell.h"
 #include "sql/stmt/filter_stmt.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 #include <cassert>
-#include <cstddef>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 #include "filter_stmt.h"
 
-SelectStmt::~SelectStmt()
-{
-  if (nullptr != filter_stmt_) {
-    delete filter_stmt_;
-    filter_stmt_ = nullptr;
-  }
-}
-
 RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
 {
-  QueryListGenerator                  query_list_generator;
   RC                                  rc;
   Table                              *default_table = nullptr;
-  unordered_map<std::string, Table *> query_tables;
   vector<unique_ptr<Expression>>      query_list;
   vector<std::string>                 tuple_schema;
   FilterStmt                         *filter_stmt = nullptr;
 
-  for (auto &rel_name : select_sql.relations) {
-    Table *table = db->find_table(rel_name.c_str());
-    if (table == nullptr) {
-      LOG_WARN("table not exist: %s", rel_name.c_str());
-      return RC::SCHEMA_TABLE_NOT_EXIST;
-    }
-    if (query_tables.find(rel_name) != query_tables.end()) {
-      LOG_WARN(" Not unique table: %s", rel_name.c_str());
-      return RC::SCHEMA_TABLE_EXIST;
-    }
-    query_tables[rel_name] = table;
-  }
+  vector<unique_ptr<Expression>> cell_ref_child_list;
+  vector<TupleCellSpec>          cell_ref_list;
+
+  // check if the table exists and is unique
+  // for (auto &rel_name : select_sql.relations) {
+  //   Table *table = db->find_table(rel_name.c_str());
+  //   if (table == nullptr) {
+  //     LOG_WARN("table not exist: %s", rel_name.c_str());
+  //     return RC::SCHEMA_TABLE_NOT_EXIST;
+  //   }
+  //   if (query_tables.find(rel_name) != query_tables.end()) {
+  //     LOG_WARN(" Not unique table: %s", rel_name.c_str());
+  //     return RC::SCHEMA_TABLE_EXIST;
+  //   }
+  //   query_tables[rel_name] = table;
+  // }
 
   if (select_sql.relations.size() == 1) {
     default_table = query_tables[select_sql.relations[0]];
   }
 
-  query_list_generator = QueryListGenerator(default_table, query_tables);
+  // 设置聚合回调
+  QueryListGenerator query_list_generator = QueryListGenerator(default_table, query_tables);
+  query_list_generator.set_on_aggregate_found(
+      [&cell_ref_list, &cell_ref_child_list](
+          AggregateType, std::unique_ptr<Expression> child, TupleCellSpec spec) -> RC {
+        cell_ref_child_list.push_back(std::move(child));
+        cell_ref_list.push_back(spec);
+        return RC::SUCCESS;
+      });
 
   rc = query_list_generator.generate_query_list(select_sql.attributes, query_list);
   if (rc != RC::SUCCESS) {

@@ -21,12 +21,12 @@ See the Mulan PSL v2 for more details. */
 #include "common/rc.h"
 #include "sql/expr/expression.h"
 
+#include "sql/stmt/filter_stmt.h"
 #include "sql/stmt/stmt.h"
 
 class FieldMeta;
 class Db;
 class Table;
-class FilterStmt;
 
 /**
  * @brief 表示select语句
@@ -36,7 +36,10 @@ class SelectStmt : public Stmt
 {
 public:
   SelectStmt() = default;
-  ~SelectStmt() override;
+  virtual ~SelectStmt() {
+    delete filter_stmt_;
+    filter_stmt_ = nullptr;
+  };
 
   StmtType type() const override { return StmtType::SELECT; }
 
@@ -52,7 +55,7 @@ public:
   const std::vector<std::string>           &tuple_schema() const { return tuple_schema_; }
 
 private:
-  std::vector<std::unique_ptr<Expression>> query_expr_list_;
+  std::vector<std::unique_ptr<Expression>> query_expr_list_; // 用于生成ProjectOperator
   std::vector<Table *>                     query_tables_;
   std::vector<std::string> tuple_schema_;  // query_expr_list_中的资源会被转移，因此需要额外设置tuple_schema字段
   FilterStmt *filter_stmt_ = nullptr;

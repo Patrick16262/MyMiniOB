@@ -3,13 +3,16 @@
 #include "common/rc.h"
 #include "sql/expr/expr_type.h"
 #include "sql/expr/expression.h"
+#include "sql/expr/tuple_cell.h"
 #include "sql/parser/defs/expression_sql_defs.h"
 #include "sql/parser/defs/sql_node_fwd.h"
 #include "sql/parser/value.h"
 #include "storage/field/field_meta.h"
+#include <fcntl.h>
 #include <map>
 #include <memory>
 #include <sstream>
+#include <utility>
 #include <vector>
 #include "sql/expr/function.h"
 
@@ -21,6 +24,18 @@ using namespace std;
  */
 RC ExpressionGenerator::generate_expression(const ExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr)
 {
+  // 找到group by的表达式，将其转换为聚合函数
+  for (auto *group_by_expr : group_by_exprs_) {
+    if (*group_by_expr == *sql_node) {
+      AggregateExpressionSqlNode *tmp = new AggregateExpressionSqlNode;
+      tmp->aggregate_type             = AggregateType::GROUP;
+      tmp->child                      = const_cast<ExpressionSqlNode *>(sql_node);
+      tmp->name                       = sql_node->name;
+      sql_node                        = tmp;
+      break;
+    }
+  }
+
   switch (sql_node->expr_type) {
     case ExprType::FIELD: {
       return generate_expression(static_cast<const FieldExpressionSqlNode *>(sql_node), expr);
@@ -41,7 +56,7 @@ RC ExpressionGenerator::generate_expression(const ExpressionSqlNode *sql_node, s
       return generate_expression(static_cast<const ArithmeticExpressionSqlNode *>(sql_node), expr);
     } break;
     case ExprType::AGGREGATE: {
-      return RC::UNIMPLENMENT;
+      return generate_expression(static_cast<const AggregateExpressionSqlNode *>(sql_node), expr);
     } break;
     case ExprType::SUBQUERY: {
       return RC::UNIMPLENMENT;
@@ -91,12 +106,11 @@ RC ExpressionGenerator::generate_expression(const FieldExpressionSqlNode *sql_no
   const FieldMeta      *field = nullptr;
 
   if (attr.attribute_name == "*") {
-    LOG_WARN("field name is *, which might not be resovled");
+    LOG_WARN("field name is *, which might have not been resovled");
     return RC::INVALID_ARGUMENT;
   }
 
   if (attr.relation_name.empty()) {
-
     if (default_table_ == nullptr) {
       // 如果没有指定表，则使用默认表, 如果默认表也为空，则报错
       LOG_WARN("default table is nullptr");
@@ -286,13 +300,58 @@ RC ExpressionGenerator::generate_expression(const NotExpressionSqlNode *sql_node
 RC ExpressionGenerator::generate_expression(
     const FunctionExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr)
 {
+  RC                               rc;
   vector<unique_ptr<Expression>>   param_exprs;
+  unique_ptr<FunctionExpression>   function_expression;
   static map<string, FunctionType> function_name_map{
       {"length", FunctionType::LENGTH}, {"round", FunctionType::ROUND}, {"date_format", FunctionType::DATE_FORMAT}};
+  static map<string, AggregateType> aggregate_name_map{{"count", AggregateType::COUNT},
+      {"sum", AggregateType::SUM},
+      {"avg", AggregateType::AVG},
+      {"max", AggregateType::MAX},
+      {"min", AggregateType::MIN}};
 
+  // 转换函数名为小写
+  stringstream lower_case_name;
+  for (auto c : sql_node->function_name) {
+    lower_case_name << static_cast<char>(tolower(c));
+  }
+
+  // 判断是什么函数
+  auto it = function_name_map.find(lower_case_name.str());
+  if (it == function_name_map.end()) {
+    auto it = aggregate_name_map.find(lower_case_name.str());
+    if (it == aggregate_name_map.end()) {
+      LOG_WARN("unknown function name: %s", sql_node->function_name.c_str());
+      return RC::INVALID_FUNCTION_NAME;
+    }
+
+    // 发现聚合函数
+    LOG_INFO("found aggregate function: %s", sql_node->function_name.c_str());
+
+    AggregateExpressionSqlNode *aggregate_sql_node = new AggregateExpressionSqlNode();
+    aggregate_sql_node->aggregate_type             = it->second;
+    if (sql_node->param_exprs.size() != 1) {
+      LOG_WARN("invalid number of parameters for aggregate function: %s, expected 1, got %ld",
+       sql_node->function_name.c_str(), sql_node->param_exprs.size());
+      return RC::INVALID_ARGUMENT;
+    }
+
+    aggregate_sql_node->child = sql_node->param_exprs[0];
+    rc                        = generate_expression(aggregate_sql_node, expr);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("generate aggregate expression failed");
+      return rc;
+    }
+
+    expr->set_name(sql_node->name);
+    return RC::SUCCESS;
+  }
+
+  // 生成参数表达式
   for (auto *param : sql_node->param_exprs) {
     unique_ptr<Expression> param_expr;
-    RC                     rc = generate_expression(param, param_expr);
+    rc = generate_expression(param, param_expr);
     if (rc != RC::SUCCESS) {
       LOG_WARN("generate param expression failed");
       return rc;
@@ -300,30 +359,85 @@ RC ExpressionGenerator::generate_expression(
     param_exprs.push_back(std::move(param_expr));
   }
 
-  stringstream lower_case_name;
-  for (auto c : sql_node->function_name) {
-    lower_case_name << static_cast<char>(tolower(c));
-  }
-
-  auto it = function_name_map.find(lower_case_name.str());
-  if (it == function_name_map.end()) {
-    LOG_WARN("unknown function name: %s", sql_node->function_name.c_str());
-    return RC::INVALID_FUNCTION_NAME;
-  }
-
+  // 根据函数类型生成具体的函数表达式
   switch (it->second) {
     case FunctionType::LENGTH: {
-      expr.reset(new LengthFunction(param_exprs));
+      function_expression.reset(new LengthFunction(param_exprs));
     } break;
     case FunctionType::ROUND: {
-      expr.reset(new RoundFunction(param_exprs));
+      function_expression.reset(new RoundFunction(param_exprs));
     } break;
     case FunctionType::DATE_FORMAT: {
-      expr.reset(new DateFormatFunction(param_exprs));
+      function_expression.reset(new DateFormatFunction(param_exprs));
     } break;
     default: {
       LOG_WARN("unknown function type: %d", static_cast<int>(it->second));
       return RC::UNIMPLENMENT;
+    } break;
+  }
+
+  // 检查参数是否合法
+  if (function_expression->check_params() != RC::SUCCESS) {
+    LOG_WARN("check params failed");
+    return RC::INVALID_ARGUMENT;
+  }
+
+  // 一切正常，返回函数表达式
+  expr.reset(function_expression.release());
+  expr->set_name(sql_node->name);
+  return RC::SUCCESS;
+}
+
+RC ExpressionGenerator::generate_expression(
+    const AggregateExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr)
+{
+  RC rc;
+  unique_ptr<Expression>  child_expr     = nullptr;
+  unique_ptr<CellRefExpr> cell_expr      = nullptr;
+  FieldExpressionSqlNode *tmp_field_node = nullptr;
+  TupleCellSpec           aggregate_cell(sql_node->name.c_str());  // TODO 应该用一个更好的名字
+
+  // 对count(*)进行特殊处理
+  if (sql_node->aggregate_type == AggregateType::COUNT && sql_node->child->expr_type == ExprType::FIELD &&
+      (tmp_field_node = static_cast<FieldExpressionSqlNode *>(sql_node->child))->field.attribute_name == "*") {
+    // MySQL中count(*)不能带表名
+    if (!tmp_field_node->field.relation_name.empty()) {
+      LOG_WARN("count(*) should not have table name");
+      return RC::INVALID_AGGREGATE;
+    }
+
+    //生成一个ValueExpressionSqlNode给count(*)用
+    //在mysql中，count(1)和count(*)是等价的
+    auto tmp = new ValueExpressionSqlNode;
+    tmp->value = Value(1);
+    const_cast<AggregateExpressionSqlNode *>(sql_node)->child = tmp; // 不是很规范0o0
+  }
+
+  // 生成聚合函数的参数表达式
+  rc = generate_expression(sql_node->child, child_expr);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("generate child expression failed, rc %d: %s", static_cast<int>(rc), strrc(rc));
+    return rc;
+  }
+
+  rc = on_aggregate_found_callback_(sql_node->aggregate_type, std::move(child_expr), aggregate_cell);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("on aggregate found callback failed, rc %d: %s", static_cast<int>(rc), strrc(rc));
+    return rc;
+  }
+
+  switch (sql_node->aggregate_type) {
+    case AggregateType::COUNT: {
+      expr.reset(new CellRefExpr(aggregate_cell, AttrType::INTS));
+    } break;
+    case AggregateType::AVG:
+    case AggregateType::MAX:
+    case AggregateType::MIN:
+    case AggregateType::SUM: {
+      expr.reset(new CellRefExpr(aggregate_cell, AttrType::FLOATS));
+    } break;
+    case AggregateType::GROUP: {
+      expr.reset(new CellRefExpr(aggregate_cell, child_expr->value_type()));
     } break;
   }
 
@@ -340,8 +454,7 @@ RC QueryListGenerator::generate_query_list(
     const vector<ExpressionSqlNode *> &sql_nodes, vector<unique_ptr<Expression>> &query_exprs)
 {
   vector<unique_ptr<Expression>> tmp_exprs;
-  FieldExpressionSqlNode        *tmp_wildcard_expression  = nullptr;
-  AggregateExpressionSqlNode    *tmp_aggregate_expression = nullptr;
+  FieldExpressionSqlNode        *tmp_wildcard_expression = nullptr;
   RC                             rc;
 
   query_exprs.clear();
@@ -361,15 +474,6 @@ RC QueryListGenerator::generate_query_list(
       query_exprs.insert(
           query_exprs.end(), std::make_move_iterator(tmp_exprs.begin()), std::make_move_iterator(tmp_exprs.end()));
 
-    } else if (sql_node->expr_type == ExprType::AGGREGATE &&
-               (tmp_aggregate_expression = static_cast<AggregateExpressionSqlNode *>(sql_node))->aggregate_type ==
-                   AggregateType::COUNT &&
-               tmp_aggregate_expression->child->expr_type == ExprType::FIELD &&
-               (tmp_wildcard_expression = static_cast<FieldExpressionSqlNode *>(tmp_aggregate_expression->child))
-                       ->field.attribute_name == "*") {
-      // 如果是count(*)的话
-      // TODO implement count(*)
-      return RC::UNIMPLENMENT;
     } else {
       // 普通的表达式
       unique_ptr<Expression> expr;

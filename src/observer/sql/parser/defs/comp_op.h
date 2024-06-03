@@ -20,3 +20,9 @@ enum class ConjunctionType {
   AND,
   OR
 };
+
+
+enum class OrderType {
+  ASC,
+  DESC
+};

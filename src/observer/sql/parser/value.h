@@ -15,7 +15,9 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include "common/rc.h"
+#include <functional>
 #include <string>
+#include <vector>
 
 /**
  * @brief 属性的类型
@@ -62,6 +64,7 @@ public:
 
   Value(const Value &other)            = default;
   Value &operator=(const Value &other) = default;
+  bool   operator==(const Value &other) const;
 
   void set_type(AttrType type) { this->attr_type_ = type; }
   void set_data(char *data, int length);
@@ -95,7 +98,9 @@ public:
   float       get_float() const;
   std::string get_string() const;
   bool        get_boolean() const;
-  double      get_double() const; // get double value，并非是解析出来的
+  double      get_double() const;  // get double value，并非是解析出来的
+
+  friend std::hash<Value>;
 
 private:
   AttrType attr_type_ = UNDEFINED;
@@ -110,7 +115,39 @@ private:
   std::string str_value_;
 };
 
+// 为了在unordered_map中使用Value
+template <>
+struct std::hash<Value>
+{
+  size_t operator()(const Value &value) const
+  {
+    size_t hash = 0;
+    switch (value.attr_type()) {
+      case INTS: hash = std::hash<int>{}(value.get_int()); break;
+      case FLOATS: hash = std::hash<float>{}(value.get_float()); break;
+      case TEXTS:
+      case CHARS: hash = std::hash<std::string>{}(value.get_string()); break;
+      case BOOLEANS: hash = std::hash<bool>{}(value.get_boolean()); break;
+      default: break;
+    }
+    return hash;
+  }
+};
+
+// 为了在unordered_map中使用vector<Value>
+template <>
+struct std::hash<std::vector<Value>>
+{
+  size_t operator()(const std::vector<Value> &vec) const
+  {
+    size_t hash = 0;
+    for (const auto &value : vec) {
+      hash ^= std::hash<Value>{}(value);
+    }
+    return hash;
+  }
+};
 
 namespace common {
-  RC try_convert_value(const Value &value, AttrType type, Value &res);
+RC try_convert_value(const Value &value, AttrType type, Value &res);
 }

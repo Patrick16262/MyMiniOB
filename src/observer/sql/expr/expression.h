@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include <string>
 #include <unordered_set>
 
+#include "sql/expr/tuple_cell.h"
 #include "sql/parser/defs/comp_op.h"
 #include "sql/parser/value.h"
 #include "storage/field/field.h"
@@ -78,6 +79,7 @@ public:
    */
   virtual std::string name() const { return name_; }
   virtual void        set_name(std::string name) { name_ = name; }
+
 
 private:
   std::string name_;
@@ -219,8 +221,7 @@ public:
   ExprType type() const override { return ExprType::CONJUNCTION; }
   AttrType value_type() const override { return BOOLEANS; }
   RC       get_value(const Tuple &tuple, Value &value) const override;
-    RC try_get_value(Value &value) const override;
-
+  RC       try_get_value(Value &value) const override;
 
   ConjunctionType conjunction_type() const { return conjunction_type_; }
 
@@ -243,7 +244,6 @@ public:
   virtual ~ArithmeticExpr() = default;
 
   ExprType type() const override { return ExprType::ARITHMETIC; }
-
   AttrType value_type() const override;
 
   RC get_value(const Tuple &tuple, Value &value) const override;
@@ -266,37 +266,52 @@ private:
   std::unique_ptr<Expression> right_;
 };
 
-
 class LikeExpr : public Expression
 {
 public:
   explicit LikeExpr(std::string partten, std::unique_ptr<Expression> child);
   virtual ~LikeExpr() = default;
 
-  RC get_value(const Tuple &tuple, Value &value) const override;
-  RC try_get_value(Value &value) const override;
-  RC match(const std::string &str, bool &value) const;
-  ExprType type() const override {return ExprType::LIKE;};
+  RC       get_value(const Tuple &tuple, Value &value) const override;
+  RC       try_get_value(Value &value) const override;
+  RC       match(const std::string &str, bool &value) const;
+  ExprType type() const override { return ExprType::LIKE; };
   AttrType value_type() const override { return BOOLEANS; };
 
 private:
-  std::regex partten_;
-  std::unique_ptr<Expression> child_;
-  const std::unordered_set<char> special_chars_ = {'^', '$', '.', '*', '+', '?', '(', ')', '[', ']', '{', '}', '|', '\\'};
+  std::regex                     partten_;
+  std::unique_ptr<Expression>    child_;
+  const std::unordered_set<char> special_chars_ = {
+      '^', '$', '.', '*', '+', '?', '(', ')', '[', ']', '{', '}', '|', '\\'};
 };
-
 
 class NotExpr : public Expression
 {
 public:
-  explicit NotExpr(std::unique_ptr<Expression> child): child_(std::move(child)) {}
+  explicit NotExpr(std::unique_ptr<Expression> child) : child_(std::move(child)) {}
   virtual ~NotExpr() = default;
 
-  RC get_value(const Tuple &tuple, Value &value) const override;
-  RC try_get_value(Value &value) const override;
-  ExprType type() const override {return ExprType::NOT;}
+  RC       get_value(const Tuple &tuple, Value &value) const override;
+  RC       try_get_value(Value &value) const override;
+  ExprType type() const override { return ExprType::NOT; }
   AttrType value_type() const override { return BOOLEANS; }
 
 private:
   std::unique_ptr<Expression> child_;
+};
+
+
+class CellRefExpr : public Expression
+{
+public:
+  CellRefExpr(const TupleCellSpec &cell_spec, AttrType cell_value_type)
+      : cell_spec_(cell_spec), cell_value_type_(cell_value_type)
+  {}  
+  RC get_value(const Tuple &tuple, Value &value) const override;
+  ExprType type() const override { return ExprType::CELL_REF; }
+  AttrType value_type() const override { return cell_value_type_; }
+
+private:
+  TupleCellSpec cell_spec_;
+  AttrType cell_value_type_;
 };

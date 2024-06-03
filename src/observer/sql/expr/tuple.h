@@ -14,11 +14,16 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include <cassert>
+#include <cfloat>
+#include <cstdio>
+#include <json/value.h>
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "common/log/log.h"
+#include "sql/expr/expr_type.h"
 #include "sql/expr/expression.h"
 #include "sql/expr/tuple_cell.h"
 #include "sql/parser/value.h"
@@ -210,7 +215,7 @@ private:
 class ProjectTuple : public Tuple
 {
 public:
-  ProjectTuple() = default;
+  ProjectTuple()          = default;
   virtual ~ProjectTuple() = default;
 
   void set_tuple(Tuple *tuple) { this->tuple_ = tuple; }
@@ -221,7 +226,7 @@ public:
     project_exprs_.swap(project_exprs);
   }
 
-  int  cell_num() const override { return project_exprs_.size(); }
+  int cell_num() const override { return project_exprs_.size(); }
 
   RC cell_at(int index, Value &cell) const override
   {
@@ -234,7 +239,7 @@ public:
     }
 
     const auto &expr = project_exprs_[index];
-    rc = expr->get_value(*tuple_, cell);
+    rc               = expr->get_value(*tuple_, cell);
     if (rc != RC::SUCCESS) {
       LOG_WARN("get value failed. rc=%d", rc);
     }
@@ -248,6 +253,10 @@ private:
   Tuple                                   *tuple_ = nullptr;
 };
 
+/**
+ * @brief 用在calc语句中
+ *
+ */
 class ExpressionTuple : public Tuple
 {
 public:
@@ -354,4 +363,233 @@ public:
 private:
   Tuple *left_  = nullptr;
   Tuple *right_ = nullptr;
+};
+
+class AggregateTupleManager;
+
+/**
+ * @brief 聚合操作所需的Tuple
+ */
+class AggregateTuple : public Tuple
+{
+public:
+  /**
+   * @brief 获取元组中的Cell的个数
+   * @details 个数应该与tuple_schema一致
+   */
+  int cell_num() const override { return aggr_exprs_.size(); }
+
+  /**
+   * @brief 获取指定位置的Cell
+   *
+   * @param index 位置
+   * @param[out] cell  返回的Cell
+   */
+  RC cell_at(int index, Value &cell) const override
+  {
+    if (index < 0 || index >= static_cast<int>(aggr_values_.size())) {
+      return RC::NOTFOUND;
+    }
+
+    const Value& value = aggr_values_[index];
+
+    if (aggr_types_[index] == AggregateType::AVG) {
+      int count;
+      float sum;
+      sscanf(value.get_string().c_str(), "count: %d, sum: %f", &count, &sum);
+      cell.set_float(sum / count);
+    } else {
+      cell = value;
+    }
+
+    return RC::SUCCESS;
+  }
+
+  /**
+   * @brief 根据cell的描述，获取cell的值
+   *
+   * @param spec cell的描述
+   * @param[out] cell 返回的cell
+   */
+  RC find_cell(const TupleCellSpec &spec, Value &cell) const override
+  {
+    const char *alias = spec.alias();
+
+    if (std::strcmp(alias, "") == 0) {
+      LOG_WARN("Cell spec should have alias, spec table=%s, spec field=%s", spec.table_name(), spec.field_name());
+    }
+
+    for (size_t i = 0; i < aggr_specs_.size(); ++i) {
+      if (std::strcmp(alias, aggr_specs_[i].alias()) == 0) {
+        return cell_at(i, cell);
+      }
+    }
+
+    LOG_WARN("Cell not found, spec alias = %s", alias);
+    return RC::NOTFOUND;
+  }
+
+  RC aggregate_tuple(Tuple &tuple)
+  {
+    for (size_t i = 0; i < aggr_exprs_.size(); ++i) {
+      Value         value;
+      Value        &aggregated_value = aggr_values_[i];
+      AggregateType aggregated_type  = aggr_types_[i];
+      Expression   *expr             = aggr_exprs_[i].get();
+
+      RC rc = expr->get_value(tuple, value);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("get value failed. rc=%d", rc);
+        return rc;
+      }
+      if (value.attr_type() == AttrType::NULLS) {
+        continue;
+      }
+
+      switch (aggregated_type) {
+        case AggregateType::SUM: {
+          if (aggregated_value.attr_type() == AttrType::NULLS) {
+            aggregated_value.set_float(value.get_double());
+          } else {
+            aggregated_value.set_float(aggregated_value.get_float() + value.get_float());
+          }
+        } break;
+        case AggregateType::COUNT: {
+          aggregated_value.set_int(aggregated_value.get_int() + 1);
+        } break;
+        case AggregateType::AVG:
+          // 使用字符串简单粗暴地记录count和sum
+          {
+            const char *fmt = "count: %d, sum: %f";
+            if (aggregated_value.attr_type() == AttrType::NULLS) {
+              char info[100];
+              sprintf(info, fmt, 1, value.get_float());
+              aggregated_value.set_string(info);
+            } else {
+              int         count;
+              float       sum;
+              std::string info = aggregated_value.get_string();
+              char        res[100];
+              sscanf(info.c_str(), fmt, &count, &sum);
+
+              sprintf(res, fmt, count + 1, sum + value.get_float());
+              aggregated_value.set_string(res);
+            }
+          }
+          break;
+        case AggregateType::MAX: {
+          if (aggregated_value.attr_type() == AttrType::NULLS) {
+            aggregated_value.set_value(value);
+          } else {
+            int cmp_res = value.compare(aggregated_value);
+            if (cmp_res > 0) {
+              aggregated_value.set_value(value);
+            }
+          }
+        } break;
+        case AggregateType::MIN:
+          if (aggregated_value.attr_type() == AttrType::NULLS) {
+            aggregated_value.set_value(value);
+          } else {
+            int cmp_res = value.compare(aggregated_value);
+            if (cmp_res < 0) {
+              aggregated_value.set_value(value);
+            }
+          }
+          break;
+        case AggregateType::GROUP:
+          if (aggregated_value != value) {
+            return RC::INTERNAL;
+          }
+          break;
+        default: {
+          LOG_WARN("Invalid aggregate type. type=%d", static_cast<int>(aggr_types_[i]));
+          return RC::INTERNAL;
+        };
+      }
+    }
+    return RC::SUCCESS;
+  }
+
+private:
+  friend class AggregateTupleManager;
+
+  AggregateTuple(const std::vector<std::unique_ptr<Expression>> &aggr_exprs,
+      const std::vector<AggregateType> &aggr_types, const std::vector<TupleCellSpec> &aggr_specs)
+      : aggr_exprs_(aggr_exprs), aggr_types_(aggr_types), aggr_specs_(aggr_specs)
+  {
+    assert(aggr_exprs.size() == aggr_types_.size() && aggr_types_.size() == aggr_specs_.size());
+  }
+
+private:
+  // 资源引用向AggregateTupleFactory的成员
+  const std::vector<std::unique_ptr<Expression>> &aggr_exprs_;
+  const std::vector<AggregateType>               &aggr_types_;
+  const std::vector<TupleCellSpec>               &aggr_specs_;
+  std::vector<Value>                              aggr_values_;
+};
+
+class AggregateTupleManager
+{
+public:
+  AggregateTupleManager(std::vector<std::unique_ptr<Expression>> &aggr_exprs, std::vector<AggregateType> &aggr_types,
+      std::vector<TupleCellSpec> &aggr_specs)
+      : aggr_exprs_(std::move(aggr_exprs)), aggr_types_(std::move(aggr_types)), aggr_specs_(std::move(aggr_specs))
+  {
+    assert(aggr_exprs.size() == aggr_types_.size() && aggr_types_.size() == aggr_specs_.size());
+  }
+
+  AggregateTuple generateTuple(const std::vector<Value> group_by)
+  {
+    AggregateTuple tuple(aggr_exprs_, aggr_types_, aggr_specs_);
+    auto           group_by_it = group_by.begin();
+
+    for (int i = 0; i < aggr_exprs_.size(); i++) {
+      Value initial_value;
+      switch (aggr_types_[i]) {
+        case AggregateType::COUNT: {
+          initial_value.set_int(0);
+        } break;
+        case AggregateType::SUM: {
+          initial_value.set_null();
+        } break;
+        case AggregateType::AVG: {
+          initial_value.set_null();
+        } break;
+        case AggregateType::MAX: {
+          initial_value.set_null();
+        } break;
+        case AggregateType::MIN: {
+          initial_value.set_null();
+        } break;
+        case AggregateType::GROUP: {
+          if (group_by_it == group_by.end()) {
+            throw std::runtime_error("Group by value not enough");
+          }
+          initial_value = *group_by_it;
+          group_by_it++;
+        } break;
+      }
+      tuple.aggr_values_.push_back(initial_value);
+    }
+
+    if (group_by_it != group_by.end()) {
+      throw std::runtime_error("Group by value too much");
+    }
+
+    return tuple;
+  }
+
+  std::vector<Expression *> group_exprs() {
+    std::vector<Expression *> exprs;
+    for (const auto &expr : aggr_exprs_) {
+      exprs.push_back(expr.get());
+    }
+    return exprs;
+  }
+
+private:
+  const std::vector<std::unique_ptr<Expression>> aggr_exprs_;
+  const std::vector<AggregateType>               aggr_types_;
+  const std::vector<TupleCellSpec>               aggr_specs_;
 };

@@ -22,7 +22,6 @@ See the Mulan PSL v2 for more details. */
 #define DEFINE_RCS                       \
   DEFINE_RC(SUCCESS)                     \
   DEFINE_RC(NULL_VALUE)                  \
-  DEFINE_RC(INVALID_ARGUMENT)            \
   DEFINE_RC(UNIMPLENMENT)                \
   DEFINE_RC(SQL_SYNTAX)                  \
   DEFINE_RC(INTERNAL)                    \
@@ -63,6 +62,9 @@ See the Mulan PSL v2 for more details. */
   DEFINE_RC(IOERR_SYNC)                  \
   DEFINE_RC(INCORRECT_DATE_VALUE)        \
   DEFINE_RC(INCORRECT_DATE_FORMAT)       \
+  DEFINE_RC(INVALID_ARGUMENT)            \
+  DEFINE_RC(INVALID_AGGREGATE)           \
+  DEFINE_RC(INVALID_GROUPING)            \
   DEFINE_RC(INVALID_FUNCTION_NAME)       \
   DEFINE_RC(LOCKED_UNLOCK)               \
   DEFINE_RC(LOCKED_NEED_WAIT)            \

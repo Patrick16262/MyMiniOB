@@ -1,6 +1,15 @@
 
 %{
 
+  /**
+    * @file yacc_sql.y
+    * @brief SQL语法解析器的yacc文件
+    * 
+    * 注意：vscode插件对.y静态语法分析文件的支持不太好，编程时要谨慎
+    *
+    * @version 1.0
+    */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -51,6 +60,7 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
         CALC
         SELECT
         DESC
+        ASC
         SHOW
         SYNC
         INSERT
@@ -81,25 +91,39 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
         DATA
         INFILE
         EXPLAIN
+        GROUP
+        BY
+        ORDER
+        HAVING
+        AS
+        JOIN
+
 
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
-  ParsedSqlNode *                   sql_node;
-  Value *                           value;
-  RelAttrSqlNode *                  rel_attr;
-  std::vector<AttrInfoSqlNode> *    attr_infos;
-  AttrInfoSqlNode *                 attr_info;
-  ExpressionSqlNode *               expression;
-  std::vector<ExpressionSqlNode *> *expression_list;
-  std::vector<Value> *              value_list;
-  std::vector<std::string> *        relation_list;
-  char *                            string;
-  int                               number;
-  float                             floats;
-  bool                              booleans;
-  ArithmeticType                    math_type;
+  ParsedSqlNode *                           sql_node;
+  Value *                                   value;
+  RelAttrSqlNode *                          rel_attr;
+  std::vector<AttrInfoSqlNode> *            attr_infos;
+  AttrInfoSqlNode *                         attr_info;
+  ExpressionSqlNode *                       expression;
+  std::vector<ExpressionSqlNode *> *        expression_list;
+  std::vector<Value> *                      value_list;
+  std::vector<std::string> *                relation_list;
+  char *                                    string;
+  int                                       number;
+  float                                     floats;
+  bool                                      booleans;
+  ArithmeticType                            math_type;
+  TableReferenceSqlNode *                   table_reference;
+  vector<TableReferenceSqlNode *> *         table_reference_list;
+  TableFactorSqlNode *                      table_factor_node;
+  ExpressionWithOrderSqlNode *              order_by_node;
+  vector<ExpressionWithOrderSqlNode *> *    order_by_list;
+  OrderType                                 order_type;
 }
+
 
 %token <number> NUMBER
 %token <floats> FLOAT
@@ -115,7 +139,7 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
 %type <value_list>          value_list
-%type <expression>          where
+%type <expression>          opt_where
 %type <relation_list>       rel_list
 %type <expression>          expression
 %type <expression_list>     expression_list
@@ -140,9 +164,19 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
 %type <sql_node>            help_stmt
 %type <sql_node>            exit_stmt
 %type <sql_node>            command_wrapper
+%type <table_reference>     table_ref
+%type <table_reference_list> table_ref_list
+%type <table_factor_node>   table_factor
+%type <order_by_node>       expression_with_order
+%type <order_by_list>       opt_order_by
+%type <order_by_list>       expression_with_order_list
+%type <expression_list>     opt_group_by
+%type <expression>          opt_having
 // commands should be a list but I use a single command instead
 %type <sql_node>            commands
 %type <booleans>            opt_not
+%type <string>              opt_alias
+%type <order_type>          opt_order_type
 
 %nonassoc LIKE
 %left OR
@@ -182,7 +216,7 @@ command_wrapper:
   | set_variable_stmt
   | help_stmt
   | exit_stmt
-    ;
+  ;
 
 exit_stmt:      
     EXIT {
@@ -387,7 +421,7 @@ value:
     ;
     
 delete_stmt:    /*  delete 语句的语法解析树*/
-    DELETE FROM ID where 
+    DELETE FROM ID opt_where 
     {
       $$ = new ParsedSqlNode(SCF_DELETE);
       $$->deletion.relation_name = $3;
@@ -399,7 +433,7 @@ delete_stmt:    /*  delete 语句的语法解析树*/
     ;
     
 update_stmt:      /*  update 语句的语法解析树*/
-    UPDATE ID SET ID EQ value where 
+    UPDATE ID SET ID EQ value opt_where 
     {
       $$ = new ParsedSqlNode(SCF_UPDATE);
       $$->update.relation_name = $2;
@@ -415,24 +449,31 @@ update_stmt:      /*  update 语句的语法解析树*/
     ;
 
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM ID rel_list where
+    SELECT expression_list FROM table_ref_list opt_where opt_group_by opt_having opt_order_by 
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
         $$->selection.attributes.swap(*$2);
         delete $2;
       }
+      if ($4 != nullptr) {
+        $$->selection.relations.swap(*$4);
+        delete $4;
+      }
       if ($5 != nullptr) {
-        $$->selection.relations.swap(*$5);
-        delete $5;
+        $$->selection.condition = $5;
       }
-      $$->selection.relations.push_back($4);
-      std::reverse($$->selection.relations.begin(), $$->selection.relations.end());
-
       if ($6 != nullptr) {
-        $$->selection.condition = $6;
+        $$->selection.group_by.swap(*$6);
+        delete $6;
       }
-      free($4);
+      if ($7 != nullptr) {
+        $$->selection.having = $7;
+      }
+      if ($8 != nullptr) {
+        $$->selection.order_by.swap(*$8);
+        delete $8;
+      }
     }
     ;
 
@@ -681,7 +722,7 @@ rel_list:
     }
     ;
   
-where:
+opt_where:
     /* empty */
     {
       $$ = nullptr;
@@ -691,7 +732,124 @@ where:
     }
     ;
 
+table_factor : ID
+    {
+      TablePrimarySqlNode* tmp = new TablePrimarySqlNode;
+      tmp->relation_name = $1;
 
+      $$ = tmp;
+    }
+    | LBRACE select_stmt RBRACE
+    {
+      TableSubquerySqlNode* tmp = new TableSubquerySqlNode;
+      tmp->subquery = $2;
+
+      $$ = tmp;
+    }
+
+
+table_ref : table_factor opt_alias
+    {
+      $$ = $1;
+      if ($2 != nullptr) {
+        $$->alias = $2;
+      }
+    }
+    | table_ref JOIN table_factor ON expression opt_alias
+    {
+      TableJoinSqlNode *tmp = new TableJoinSqlNode;
+      tmp->left = $1;
+      tmp->right = $3;
+      tmp->condition = $5;
+
+      $$ = tmp;
+      if ($6 != nullptr) {
+        $$->alias = $6;
+      }
+    }
+
+
+table_ref_list : table_factor
+    {
+      $$ = new std::vector<TableReferenceSqlNode *>;
+      $$->push_back($1);
+    }
+    | table_factor COMMA table_ref_list
+    {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new std::vector<TableReferenceSqlNode *>;
+      }
+      $$->insert($$->begin(), $1);
+    }
+
+expression_with_order : opt_order_type expression 
+    {
+      ExpressionWithOrderSqlNode *tmp = new ExpressionWithOrderSqlNode;
+      tmp->expr = $2;
+      tmp->order_type = $1;
+
+      $$ = tmp;
+    }
+
+expression_with_order_list : expression_with_order
+    {
+      $$ = new std::vector<ExpressionWithOrderSqlNode *>;
+      $$->push_back($1);
+    }
+    | expression_with_order COMMA expression_with_order_list
+    {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new std::vector<ExpressionWithOrderSqlNode *>;
+      }
+      $$->insert($$->begin(), $1);
+    }
+
+opt_order_by : /*empty*/
+    {
+      $$ = nullptr;
+    }
+    | ORDER BY expression_with_order_list
+    {
+      $$ = $3;
+    }
+
+
+opt_group_by : /*empty*/
+    {
+      $$ =nullptr;
+    }
+    | GROUP BY expression_with_order_list
+    {
+      $$ = $3;
+    }
+
+
+opt_order_type : /*empty*/
+    {
+      $$ = OrderType::ASC;
+    }
+    | ASC
+    {
+      $$ = OrderType::ASC;
+    }
+    | DESC
+    {
+      $$ = OrderType::DESC;
+    }
+
+
+opt_having : /*empty*/
+    {
+      $$ = nullptr;
+    }
+    | HAVING expression
+    {
+      $$ = $2;
+    }
 
 load_data_stmt:
     LOAD DATA INFILE SSS INTO TABLE ID 
@@ -732,6 +890,17 @@ opt_semicolon: /*empty*/
 opt_not: /*empty*/
     {$$ = false;}
     | NOT {$$ = true;}
+    ;
+
+opt_alias: /*empty*/
+    {$$ = nullptr}
+    | opt_as ID
+    {
+      $$ = $2;
+    }
+
+opt_as : /*empty*/
+    | AS
     ;
 
 %%

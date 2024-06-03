@@ -44,11 +44,6 @@ RC FunctionExpression::try_get_value(Value &value) const
 
 RC LengthFunction::function_body(std::vector<Value> params, Value &result) const
 {
-  if (params.size() != 1) {
-    LOG_WARN("Invalid number of parameters for length function, expected 1, got %zu", params.size());
-    return RC::INVALID_ARGUMENT;
-  }
-
   try {
     params[0].get_string();
   } catch (bad_cast_exception) {
@@ -60,13 +55,17 @@ RC LengthFunction::function_body(std::vector<Value> params, Value &result) const
   return RC::SUCCESS;
 }
 
-RC RoundFunction::function_body(std::vector<Value> params, Value &result) const
+RC LengthFunction::check_params() const
 {
-  if (params.size() != 1 && params.size() != 2) {
-    LOG_WARN("Invalid number of parameters for round function, expected 1 or 2, got %zu", params.size());
+  if (FunctionExpression::param_exprs_.size() != 1) {
+    LOG_WARN("Invalid number of parameters for length function, expected 1, got %zu", FunctionExpression::param_exprs_.size());
     return RC::INVALID_ARGUMENT;
   }
+  return RC::SUCCESS;
+}
 
+RC RoundFunction::function_body(std::vector<Value> params, Value &result) const
+{
   if (params.size() == 1) {
     float num;
     try {
@@ -96,6 +95,16 @@ RC RoundFunction::function_body(std::vector<Value> params, Value &result) const
   return RC::SUCCESS;
 }
 
+RC RoundFunction::check_params() const
+{
+  if (FunctionExpression::param_exprs_.size() != 1 && FunctionExpression::param_exprs_.size() != 2) {
+    LOG_WARN("Invalid number of parameters for round function, expected 1 or 2, got %zu", FunctionExpression::param_exprs_.size());
+    return RC::INVALID_ARGUMENT;
+  }
+
+  return RC::SUCCESS;
+}
+
 float RoundFunction::do_round(float num, int precision) const
 {
   float factor = pow(10, precision);
@@ -108,11 +117,6 @@ RC DateFormatFunction::function_body(std::vector<Value> params, Value &result) c
   Value  date;
   string format;
   RC     rc;
-
-  if (params.size() != 2) {
-    LOG_WARN("Invalid number of parameters for date_format function, expected 2, got %zu", params.size());
-    return RC::INVALID_ARGUMENT;
-  }
 
   try {
     string date_string = params[0].get_string();
@@ -140,6 +144,14 @@ RC DateFormatFunction::function_body(std::vector<Value> params, Value &result) c
   }
 
   result.set_string(formatted_date.c_str());
+  return RC::SUCCESS;
+}
+
+RC DateFormatFunction::check_params() const {
+  if (FunctionExpression::param_exprs_.size() != 2) {
+    LOG_WARN("Invalid number of parameters for date_format function, expected 2, got %zu", FunctionExpression::param_exprs_.size());
+    return RC::INVALID_ARGUMENT;
+  }
   return RC::SUCCESS;
 }
 

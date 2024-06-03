@@ -557,3 +557,7 @@ RC NotExpr::try_get_value(Value &value) const
 
   return RC::SUCCESS;
 }
+
+RC CellRefExpr::get_value(const Tuple &tuple, Value &value) const {
+  return tuple.find_cell(cell_spec_, value);
+}
