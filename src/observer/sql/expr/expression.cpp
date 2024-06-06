@@ -13,13 +13,17 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/expr/expression.h"
+#include "common/log/log.h"
 #include "common/rc.h"
 #include "sql/expr/tuple.h"
 #include "sql/parser/defs/comp_op.h"
 #include "sql/parser/value.h"
+#include <cassert>
 #include <regex>
 #include <sstream>
+#include <unordered_set>
 #include <utility>
+#include <vector>
 
 using namespace std;
 
@@ -254,8 +258,9 @@ RC ConjunctionExpr::get_value(const Tuple &tuple, Value &value) const
   return rc;
 }
 
-RC ConjunctionExpr::try_get_value(Value &value) const {
-   RC rc = RC::SUCCESS;
+RC ConjunctionExpr::try_get_value(Value &value) const
+{
+  RC rc = RC::SUCCESS;
   if (children_.empty()) {
     value.set_boolean(true);
     return rc;
@@ -263,7 +268,7 @@ RC ConjunctionExpr::try_get_value(Value &value) const {
 
   Value tmp_value;
   for (const unique_ptr<Expression> &expr : children_) {
-    rc = expr->try_get_value( tmp_value);
+    rc = expr->try_get_value(tmp_value);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to get value by child expression. rc=%s", strrc(rc));
       return rc;
@@ -444,7 +449,7 @@ LikeExpr::LikeExpr(std::string partten, std::unique_ptr<Expression> child) : chi
       ss << c;
     }
   }
-  //Mysql的Like是大小写不敏感的
+  // Mysql的Like是大小写不敏感的
   partten_ = regex(ss.str(), regex_constants::icase);
 }
 
@@ -558,6 +563,103 @@ RC NotExpr::try_get_value(Value &value) const
   return RC::SUCCESS;
 }
 
-RC CellRefExpr::get_value(const Tuple &tuple, Value &value) const {
-  return tuple.find_cell(cell_spec_, value);
+RC TupleCellExpr::get_value(const Tuple &tuple, Value &value) const { return tuple.find_cell(cell_spec_, value); }
+
+RC InExpr::get_value(const Tuple &tuple, Value &value) const
+{
+  Value                left;
+  unordered_set<Value> values;
+  RC                   rc;
+
+  rc = left_->get_value(tuple, left);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  if (subquery_ref_) {
+    Value  subquery_string_value;
+    string subquery_string;
+    subquery_ref_->get_value(tuple, subquery_string_value);
+    subquery_string = subquery_string_value.get_string();
+
+    auto cur_values = common::string_to_arr(subquery_string.c_str());
+    for (Value &value : cur_values) {
+      values.insert(value);
+    }
+  } else {
+    for (const auto &expr : value_list_) {
+      Value v;
+      RC    rc = expr->get_value(tuple, v);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
+        return rc;
+      }
+      values.insert(v);
+    }
+  }
+
+  value.set_boolean(values.find(left) != values.end());
+
+  return RC::SUCCESS;
+}
+
+RC InExpr::try_get_value(Value &value) const
+{
+  Value                left;
+  RC                   rc;
+  unordered_set<Value> values;
+
+  if (subquery_ref_) {
+    return RC::UNIMPLENMENT;
+  }
+
+  rc = left_->try_get_value(left);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+
+  for (const auto &expr : value_list_) {
+    Value v;
+    RC    rc = expr->try_get_value(v);
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
+    values.insert(v);
+  }
+
+  value.set_boolean(values.find(left) != values.end());
+
+  return RC::SUCCESS;
+}
+
+RC ExistsExpr::get_value(const Tuple &tuple, Value &value) const
+{
+  assert(subquery_ref_);
+  return subquery_ref_->get_value(tuple, value);
+}
+
+RC ExistsExpr::try_get_value(Value &value) const { return RC::UNIMPLENMENT; }
+
+RC IsNullExpression::get_value(const Tuple &tuple, Value &value) const
+{
+  RC rc = child_->get_value(tuple, value);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to get value of child expression. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  value.set_boolean(value.attr_type() == NULLS);
+  return RC::SUCCESS;
+}
+
+RC IsNullExpression::try_get_value(Value &value) const
+{
+  RC rc = child_->try_get_value(value);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+
+  value.set_boolean(value.attr_type() == NULLS);
+  return RC::SUCCESS;
 }

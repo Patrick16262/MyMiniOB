@@ -97,6 +97,9 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
         HAVING
         AS
         JOIN
+        IS
+        EXISTS
+        IN
 
 
 
@@ -118,7 +121,7 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
   ArithmeticType                            math_type;
   TableReferenceSqlNode *                   table_reference;
   vector<TableReferenceSqlNode *> *         table_reference_list;
-  TableFactorSqlNode *                      table_factor_node;
+  TableReferenceSqlNode *                   table_factor_node;
   ExpressionWithOrderSqlNode *              order_by_node;
   vector<ExpressionWithOrderSqlNode *> *    order_by_list;
   OrderType                                 order_type;
@@ -166,6 +169,7 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
 %type <sql_node>            command_wrapper
 %type <table_reference>     table_ref
 %type <table_reference_list> table_ref_list
+%type <table_reference_list> opt_table_refs
 %type <table_factor_node>   table_factor
 %type <order_by_node>       expression_with_order
 %type <order_by_list>       opt_order_by
@@ -449,30 +453,30 @@ update_stmt:      /*  update 语句的语法解析树*/
     ;
 
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM table_ref_list opt_where opt_group_by opt_having opt_order_by 
+    SELECT expression_list opt_table_refs opt_where opt_group_by opt_having opt_order_by 
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
         $$->selection.attributes.swap(*$2);
         delete $2;
       }
+      if ($3 != nullptr) {
+        $$->selection.relations.swap(*$3);
+        delete $3;
+      }
       if ($4 != nullptr) {
-        $$->selection.relations.swap(*$4);
-        delete $4;
+        $$->selection.condition = $4;
       }
       if ($5 != nullptr) {
-        $$->selection.condition = $5;
+        $$->selection.group_by.swap(*$5);
+        delete $5;
       }
       if ($6 != nullptr) {
-        $$->selection.group_by.swap(*$6);
-        delete $6;
+        $$->selection.having = $6;
       }
       if ($7 != nullptr) {
-        $$->selection.having = $7;
-      }
-      if ($8 != nullptr) {
-        $$->selection.order_by.swap(*$8);
-        delete $8;
+        $$->selection.order_by.swap(*$7);
+        delete $7;
       }
     }
     ;
@@ -653,6 +657,58 @@ expression:
       $$ = tmp;
       $$->name = (token_name(sql_string, &@$));
     }
+    | EXISTS LBRACE select_stmt RBRACE {
+      ExistsExpressionSqlNode *tmp = new ExistsExpressionSqlNode;
+      tmp->subquery = $3->select_stmt->selection;
+
+      $$ = tmp;
+      $$->name = (token_name(sql_string, &@$));
+    }
+    | expression opt_not IN LBRACE expression_list RBRACE {
+      InExpressionSqlNode *tmp = new InExpressionSqlNode;
+      tmp->child = $1;
+      tmp->values.swap(*$5);
+      delete $5;
+
+      $$ = tmp;
+
+      if ($2) {
+        NotExpressionSqlNode* not_p = new NotExpressionSqlNode;
+        not_p->child = $$;
+        $$ = not_p;
+      }
+
+      $$->name = (token_name(sql_string, &@$));
+    }
+    | expression opt_not IN LBRACE select_stmt RBRACE {
+      InExpressionSqlNode *tmp = new InExpressionSqlNode;
+      tmp->child = $1;
+      tmp->subquery = $5->selection;
+
+      $$ = tmp;
+
+      if ($2) {
+        NotExpressionSqlNode* not_p = new NotExpressionSqlNode;
+        not_p->child = $$;
+        $$ = not_p;
+      }
+
+      $$->name = (token_name(sql_string, &@$));
+    }
+    | expression IS opt_not THE_NULL {
+      IsNullExpressionSqlNode *tmp = new IsNullExpressionSqlNode;
+      tmp->child = $1;
+
+      $$ = tmp;
+
+      if ($2) {
+        NotExpressionSqlNode* not_p = new NotExpressionSqlNode;
+        not_p->child = $$;
+        $$ = not_p;
+      }
+
+      $$->name = (token_name(sql_string, &@$));
+    }
     | ID LBRACE expression_list RBRACE {
       FunctionExpressionSqlNode *tmp = new FunctionExpressionSqlNode;
       tmp->param_exprs.swap(*$3);
@@ -732,30 +788,39 @@ opt_where:
     }
     ;
 
-table_factor : ID
+table_factor : ID 
     {
       TablePrimarySqlNode* tmp = new TablePrimarySqlNode;
       tmp->relation_name = $1;
 
       $$ = tmp;
     }
-    | LBRACE select_stmt RBRACE
+    | LBRACE select_stmt RBRACE 
     {
       TableSubquerySqlNode* tmp = new TableSubquerySqlNode;
-      tmp->subquery = $2;
+      tmp->subquery = $2->selection;
 
       $$ = tmp;
     }
 
+opt_table_refs : /*empty*/
+    {
+      $$ = nullptr;
+    }
+    | FROM table_ref_list
+    {
+      $$ = $2;
+    }
 
 table_ref : table_factor opt_alias
     {
       $$ = $1;
       if ($2 != nullptr) {
         $$->alias = $2;
+        delete $2;
       }
     }
-    | table_ref JOIN table_factor ON expression opt_alias
+    | table_ref JOIN table_factor ON expression 
     {
       TableJoinSqlNode *tmp = new TableJoinSqlNode;
       tmp->left = $1;
@@ -763,9 +828,6 @@ table_ref : table_factor opt_alias
       tmp->condition = $5;
 
       $$ = tmp;
-      if ($6 != nullptr) {
-        $$->alias = $6;
-      }
     }
 
 
@@ -822,7 +884,7 @@ opt_group_by : /*empty*/
     {
       $$ =nullptr;
     }
-    | GROUP BY expression_with_order_list
+    | GROUP BY expression_list
     {
       $$ = $3;
     }

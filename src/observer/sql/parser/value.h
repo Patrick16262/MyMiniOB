@@ -102,6 +102,11 @@ public:
 
   friend std::hash<Value>;
 
+public:
+  std::string to_complex_string() const;
+  void from_complex_string(const char *str);
+
+
 private:
   AttrType attr_type_ = UNDEFINED;
   int      length_    = 0;
@@ -149,5 +154,7 @@ struct std::hash<std::vector<Value>>
 };
 
 namespace common {
-RC try_convert_value(const Value &value, AttrType type, Value &res);
-}
+RC                 try_convert_value(const Value &value, AttrType type, Value &res);
+std::string        arr_to_string(const std::vector<Value> &arr);
+std::vector<Value> string_to_arr(const char *json);
+}  // namespace common

@@ -6,14 +6,13 @@
  * @brief 描述一个属性
  * @ingroup SQLParser
  * @details 属性，或者说字段(column, field)
- * Rel -> Relation
+ * Rel -> Relation )
  * Attr -> Attribute
  */
 struct RelAttrSqlNode
 {
-  std::string relation_name;   ///< relation name (may be NULL) 表名
+  std::string relation_name;   ///< relation name (may be empty) 表名
   std::string attribute_name;  ///< attribute name              属性名
-  std::string alias;           ///< alias name                  别名
 };
 
 enum class RelationType
@@ -21,6 +20,7 @@ enum class RelationType
   TABLE,
   SELECT,
   JOIN,
+  VIEW,
 };
 
 /**
@@ -32,15 +32,6 @@ public:
   RelationType type;
   std::string  alias;
 };
-
-/**
- * @brief 描述一个primary table或者subquery, 用于join从句
- * 
- */
-class TableFactorSqlNode : public TableReferenceSqlNode
-{};
-
-
 
 
 /**

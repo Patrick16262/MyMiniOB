@@ -20,6 +20,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/parser/parse_defs.h"
 #include <cassert>
 #include <cstdlib>
+#include <json/reader.h>
+#include <json/value.h>
 #include <ranges>
 #include <sstream>
 #include <string>
@@ -489,6 +491,38 @@ double Value::get_double() const
   return 0;
 }
 
+Json::StaticString type("type");
+Json::StaticString string_value("stringValue");
+Json::StaticString int_value("intValue");
+Json::StaticString value_length("length");
+
+std::string Value::to_complex_string() const
+{
+  Json::Value json;
+  json[type]         = static_cast<int>(attr_type_);
+  json[int_value]    = num_value_.int_value_;
+  json[string_value] = str_value_;
+  json[value_length] = length_;
+
+  return json.toStyledString();
+}
+
+void Value::from_complex_string(const char *str)
+{
+  Json::Reader reader;
+  Json::Value  json;
+  if (!reader.parse(str, json)) {
+    LOG_WARN("failed to parse json string. str=%s", str);
+    throw std::runtime_error("failed to parse json string");
+    return;
+  }
+
+  attr_type_            = static_cast<AttrType>(json[type].asInt());
+  num_value_.int_value_ = json[int_value].asInt();
+  str_value_            = json[string_value].asString();
+  length_               = json[value_length].asInt();
+}
+
 namespace common {
 /**
  * 将value转换为指定的类型
@@ -539,6 +573,34 @@ RC try_convert_value(const Value &value, AttrType type, Value &res)
     return RC::NULL_VALUE;
   }
   return RC::SUCCESS;
+}
+
+std::vector<Value> string_to_arr(const char *json)
+{
+  Json::Reader reader;
+  Json::Value  root;
+  if (!reader.parse(json, root)) {
+    LOG_WARN("failed to parse json string. str=%s", json);
+    throw std::runtime_error("failed to parse json string");
+  }
+
+  std::vector<Value> arr;
+  for (const Json::Value &value : root) {
+    Value v;
+    auto  s = value.toStyledString();
+    v.from_complex_string(s.c_str());
+    arr.push_back(v);
+  }
+  return arr;
+}
+
+std::string arr_to_string(const std::vector<Value> &arr)
+{
+  Json::Value json;
+  for (const Value &value : arr) {
+    json.append(value.to_complex_string());
+  }
+  return json.toStyledString();
 }
 
 }  // namespace common

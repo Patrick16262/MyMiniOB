@@ -1,30 +1,47 @@
 #pragma once
 
-#include "common/log/log.h"
 #include "common/rc.h"
 #include "sql/expr/expr_type.h"
 #include "sql/expr/expression.h"
+#include "sql/expr/expression_refactor.h"
 #include "sql/expr/tuple_cell.h"
 #include "sql/parser/defs/expression_sql_defs.h"
+#include "sql/parser/defs/sql_query_nodes.h"
+#include "sql/stmt/table_ref_desc.h"
 #include "storage/db/db.h"
-#include "storage/table/table.h"
 #include <cassert>
-#include <functional>
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
+
+/**
+ * @brief 表达式生成器，用于将sql语法树中的表达式节点转换为表达式对象
+ */
 
 class ExpressionGenerator
 {
 public:
   ExpressionGenerator() = default;
-  ExpressionGenerator(Table *default_table_, unordered_map<std::string, Table *> &query_tables)
-      : default_table_(default_table_), query_tables_(query_tables)
-  {}
+  ExpressionGenerator(
+      Db *db, std::vector<TableFactorDesc> table_desc, std::vector<TupleCellSpec> tuple_schema_ = {} /*子查询用到的*/)
+      : db_(db)
+  {
+    for (auto &desc : table_desc) {
+      for (auto &field : desc.field_names()) {
+        field_table_map_.insert({field, desc});
+      }
+    }
+    for (auto &cell : tuple_schema_) {
+      outter_alias_set_.insert(cell.alias());
+    }
+  }
   virtual ~ExpressionGenerator() = default;
 
   RC generate_expression(const ExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr);
+
+private:
   RC generate_expression(const ValueExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr);
   RC generate_expression(const FieldExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr);
   RC generate_expression(const ArithmeticExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr);
@@ -34,63 +51,125 @@ public:
   RC generate_expression(const LikeExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr);
   RC generate_expression(const NotExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr);
   RC generate_expression(const FunctionExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr);
-  RC generate_expression(const AggregateExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr);
-
-  // 将模式设置为带有group by从句
-  void set_resovle_mode_group(const vector<ExpressionSqlNode *> &group_by_exprs)
-  {
-    group_by_exprs_.insert(group_by_exprs_.end(), group_by_exprs.begin(), group_by_exprs.end());
-  }
-
-  void set_on_aggregate_found(
-      const std::function<RC(AggregateType type, std::unique_ptr<Expression> child_expr, TupleCellSpec aggregate_cell)>
-          &on_aggregate_found_callback)
-  {
-    on_aggregate_found_callback_ = on_aggregate_found_callback;
-  }
+  RC generate_expression(const TupleCellExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr);
+  RC generate_expression(const IsNullExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr);
+  RC generate_expression(const InExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr);
+  RC generate_expression(const ExistsExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr);
 
 private:
-  std::function<RC(AggregateType type, std::unique_ptr<Expression> child_expr, TupleCellSpec aggregate_cell)>
-      on_aggregate_found_callback_ = [](AggregateType, std::unique_ptr<Expression>, TupleCellSpec) {
-        LOG_WARN("Aggregate function is not allowed here");
-        return RC::INVALID_AGGREGATE;
-      };
-
-private:
-  Table                              *default_table_ = nullptr;
-  unordered_map<std::string, Table *> query_tables_;
-
-  vector<ExpressionSqlNode *> group_by_exprs_;
+  std::unordered_multimap<std::string, TableFactorDesc> field_table_map_;   // 字段->表
+  std::unordered_set<std::string>                       outter_alias_set_;  // 父查询中的别名
+  Db                                                   *db_ = nullptr;      // nullable
 };
 
-// 当前暂不支持聚合函数表达式和常量表达式混合使用
+/**
+ * @brief 常量表达式解析器，目前暂时没有用到
+ */
+class ConstExpressionResovler
+{
+public:
+  ConstExpressionResovler()          = default;
+  virtual ~ConstExpressionResovler() = default;
+
+  RC resolve(const ExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr);
+
+private:
+  ExpressionGenerator generator_;
+};
+
+/**
+ * @brief 即不包括子查询也不包括聚合函数的表达式解析器，用于解析join条件中的表达式
+ * @note 该对象是有状态的一次性对象，不要重用
+ *
+ */
+class JoinConditionExpressionResolver
+{
+public:
+  JoinConditionExpressionResolver(Db *db, std::vector<TableFactorDesc> table_desc) : generator_(db, table_desc){};
+  virtual ~JoinConditionExpressionResolver() = default;
+
+  RC resolve(const ExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr);
+
+private:
+  ExpressionGenerator generator_;
+};
+
+/**
+ * @brief 不包括聚合函数的表达式解析器，用于解析where条件中的表达式
+ * @note 该对象是有状态的一次性对象，不要重用
+ */
+class WhereConditionExpressionResolver
+{
+public:
+  WhereConditionExpressionResolver(
+      Db *db, std::vector<TableFactorDesc> table_desc, std::vector<TupleCellSpec> tuple_schema)
+      : generator_(db, table_desc), db_(db), table_desc_(std::move(table_desc)), tuple_schema_(tuple_schema){};
+  virtual ~WhereConditionExpressionResolver() = default;
+
+  RC resolve(ExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr);
+
+public:
+  std::vector<std::unique_ptr<SelectSqlNode>> &subquery_sqls() { return refactor_.subqueries(); }
+  std::vector<SubqueryType>                   &subquery_types() { return refactor_.subquery_types(); }
+  std::vector<TupleCellSpec>                  &subquery_cell_desc() { return refactor_.subquery_cells(); }
+
+private:
+  ExpressionGenerator      generator_;
+  ExpressionStructRefactor refactor_;
+
+  Db                          *db_ = nullptr;
+  std::vector<TableFactorDesc> table_desc_;
+  std::vector<TupleCellSpec>   tuple_schema_;
+};
+
+/**
+ * @brief 聚合函数表达式解析器, 不解析聚合函数
+ * @note 当前将Groupby的resovler认为和where相同
+ *
+ */
+using GroupByExpressionResolver = WhereConditionExpressionResolver;
+
+/**
+ * @brief 对查询的属性进行解析
+ * @note 该对象是有状态的一次性对象，不要重用
+ */
+
 class QueryListGenerator
 {
 public:
   QueryListGenerator() = default;
-  QueryListGenerator(Table *default_table, unordered_map<std::string, Table *> &query_tables)
-      : query_tables_(query_tables), generator_(default_table, query_tables)
-  {}
+  QueryListGenerator(Db *db, std::vector<TableFactorDesc> table_desc, std::vector<TupleCellSpec> outter_tuple,
+      std::vector<ExpressionSqlNode *> group_exprs)
+      : db_(db),
+        table_desc_(std::move(table_desc)),
+        outter_tuple_(std::move(outter_tuple)),
+        group_exprs_(std::move(group_exprs))
+  {
+    assert(db_ != nullptr);
+  }
   virtual ~QueryListGenerator() = default;
 
   RC generate_query_list(const vector<ExpressionSqlNode *> &sql_nodes, vector<unique_ptr<Expression>> &query_exprs);
 
-  void set_group_by(const vector<ExpressionSqlNode *> &group_by_exprs)
-  {
-    generator_.set_resovle_mode_group(group_by_exprs);
-  }
-
-  void set_on_aggregate_found(
-      const std::function<RC(AggregateType type, std::unique_ptr<Expression> child_expr, TupleCellSpec aggregate_cell)>
-          &on_aggregate_found_callback)
-  {
-    generator_.set_on_aggregate_found(on_aggregate_found_callback);
-  }
+public:
+  std::vector<SubqueryType>              &subquery_types()  { return subquery_types_; }
+  std::vector<unique_ptr<SelectSqlNode>> &subquerys()  { return subquerys_; }
+  std::vector<TupleCellSpec>             &subquery_cell_desc()  { return subquery_cell_desc_; }
+  std::vector<unique_ptr<AggregateDesc>> &aggregate_desc()  { return aggregate_desc_; }
 
 private:
   RC wildcard_fields(FieldExpressionSqlNode *wildcard_expression, vector<unique_ptr<Expression>> &query_exprs);
 
 private:
-  unordered_map<std::string, Table *> query_tables_;
-  ExpressionGenerator                 generator_;
+  std::vector<SubqueryType>              subquery_types_;
+  std::vector<unique_ptr<SelectSqlNode>> subquerys_;
+  std::vector<TupleCellSpec>             subquery_cell_desc_;
+
+  std::vector<unique_ptr<AggregateDesc>> aggregate_desc_;
+
+private:
+  Db                              *db_ = nullptr;
+  std::vector<TableFactorDesc>     table_desc_;
+  std::vector<TupleCellSpec>       outter_tuple_;
+  std::vector<ExpressionSqlNode *> group_exprs_;
 };

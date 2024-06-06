@@ -80,9 +80,18 @@ public:
   virtual std::string name() const { return name_; }
   virtual void        set_name(std::string name) { name_ = name; }
 
-
 private:
   std::string name_;
+};
+
+/**
+ * @brief 用于排序的表达式
+ * 
+ */
+struct ExprWithOrder
+{
+  std::unique_ptr<Expression> expr;
+  bool                        is_asc;
 };
 
 /**
@@ -300,18 +309,71 @@ private:
   std::unique_ptr<Expression> child_;
 };
 
-
-class CellRefExpr : public Expression
+class TupleCellExpr : public Expression
 {
 public:
-  CellRefExpr(const TupleCellSpec &cell_spec, AttrType cell_value_type)
+  TupleCellExpr(const TupleCellSpec &cell_spec, AttrType cell_value_type = AttrType::UNDEFINED)
       : cell_spec_(cell_spec), cell_value_type_(cell_value_type)
-  {}  
-  RC get_value(const Tuple &tuple, Value &value) const override;
+  {}
+  RC       get_value(const Tuple &tuple, Value &value) const override;
   ExprType type() const override { return ExprType::CELL_REF; }
   AttrType value_type() const override { return cell_value_type_; }
 
 private:
   TupleCellSpec cell_spec_;
-  AttrType cell_value_type_;
+  AttrType      cell_value_type_;
+};
+
+class InExpr : Expression
+{
+public:
+  InExpr(std::unique_ptr<Expression> &left, std::vector<std::unique_ptr<Expression>> &right)
+      : left_(std::move(left)), value_list_(right)
+  {}
+  InExpr(std::unique_ptr<Expression> &left, std::unique_ptr<Expression> &subquery_ref)
+      : left_(std::move(left)), subquery_ref_(std::move(subquery_ref))
+  {}
+
+  virtual ~InExpr() = default;
+
+  RC       get_value(const Tuple &tuple, Value &value) const override;
+  RC       try_get_value(Value &value) const override;
+  ExprType type() const override { return ExprType::IN; }
+  AttrType value_type() const override { return BOOLEANS; }
+
+private:
+  std::unique_ptr<Expression> left_;
+
+  std::unique_ptr<Expression>              subquery_ref_; /*nullbale*/
+  std::vector<std::unique_ptr<Expression>> value_list_;
+};
+
+class ExistsExpr : public Expression
+{
+public:
+  ExistsExpr(std::unique_ptr<Expression> &subquery_ref) : subquery_ref_(std::move(subquery_ref)) {}
+
+  virtual ~ExistsExpr() = default;
+  RC       get_value(const Tuple &tuple, Value &value) const override;
+  RC       try_get_value(Value &value) const override;
+  ExprType type() const override { return ExprType::EXISTS; }
+  AttrType value_type() const override { return BOOLEANS; }
+
+private:
+  std::unique_ptr<Expression> subquery_ref_;
+};
+
+class IsNullExpression : public Expression
+{
+public:
+  IsNullExpression(std::unique_ptr<Expression> &child) : child_(std::move(child)) {}
+  virtual ~IsNullExpression() = default;
+
+  RC       get_value(const Tuple &tuple, Value &value) const override;
+  RC       try_get_value(Value &value) const override;
+  ExprType type() const override { return ExprType::IS_NULL; }
+  AttrType value_type() const override { return BOOLEANS; }
+
+private:
+  std::unique_ptr<Expression> child_;
 };

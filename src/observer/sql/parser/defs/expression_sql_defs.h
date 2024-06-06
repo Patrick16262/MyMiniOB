@@ -5,6 +5,9 @@
 #include "sql_node_fwd.h"
 #include "comp_op.h"
 #include "vector"
+#include <cstddef>
+#include <stdexcept>
+#include <vector>
 
 class ExpressionSqlNode
 {
@@ -12,10 +15,10 @@ public:
   ExprType    expr_type = ExprType::NONE;
   std::string name;
 
-  virtual bool operator==(const ExpressionSqlNode &other) const = 0;
-  virtual int child_count() const = 0;
-  virtual ExpressionSqlNode *get_child(int index) const = 0;
-  virtual ~ExpressionSqlNode()                                  = default;
+  virtual bool                operator==(const ExpressionSqlNode &other) const = 0;
+  virtual int                 child_count() const                              = 0;
+  virtual ExpressionSqlNode *&get_child(int index)                             = 0;
+  virtual ~ExpressionSqlNode()                                                 = default;
 };
 
 class ValueExpressionSqlNode : public ExpressionSqlNode
@@ -24,15 +27,16 @@ public:
   Value value;
 
   ValueExpressionSqlNode() { ExpressionSqlNode::expr_type = ExprType::VALUE; }
-  virtual bool operator==(const ExpressionSqlNode &other) const override {
+  bool operator==(const ExpressionSqlNode &other) const override
+  {
     if (auto other_node = dynamic_cast<const ValueExpressionSqlNode *>(&other)) {
       return value == other_node->value;
     }
     return false;
   }
 
-  virtual int child_count() const override { return 0; }
-  virtual ExpressionSqlNode *get_child(int index) const override { return nullptr; }
+  int                 child_count() const override { return 0; }
+  ExpressionSqlNode *&get_child(int index) override { throw std::out_of_range("ValueExpressionSqlNode has no child"); }
 };
 
 class FieldExpressionSqlNode : public ExpressionSqlNode
@@ -41,7 +45,8 @@ public:
   RelAttrSqlNode field;
 
   FieldExpressionSqlNode() { ExpressionSqlNode::expr_type = ExprType::FIELD; }
-  virtual bool operator==(const ExpressionSqlNode &other)  const override {
+  bool operator==(const ExpressionSqlNode &other) const override
+  {
     if (auto other_node = dynamic_cast<const FieldExpressionSqlNode *>(&other)) {
       return (field.attribute_name == other_node->field.attribute_name) &&
              (field.relation_name == other_node->field.relation_name);
@@ -49,8 +54,8 @@ public:
     return false;
   }
 
-  virtual int child_count() const override { return 0; }
-  virtual ExpressionSqlNode *get_child(int index) const override { return nullptr; }
+  int                 child_count() const override { return 0; }
+  ExpressionSqlNode *&get_child(int index) override { throw std::out_of_range("FieldExpressionSqlNode has no child"); }
 };
 
 class ArithmeticExpressionSqlNode : public ExpressionSqlNode
@@ -60,7 +65,8 @@ public:
   ExpressionSqlNode *right = nullptr;
   ArithmeticType     arithmetic_type;
 
-  virtual bool operator==(const ExpressionSqlNode &other)  const override {
+  bool operator==(const ExpressionSqlNode &other) const override
+  {
     if (auto other_node = dynamic_cast<const ArithmeticExpressionSqlNode *>(&other)) {
       return (arithmetic_type == other_node->arithmetic_type) && (*left == *(other_node->left)) &&
              (*right == *(other_node->right));
@@ -76,14 +82,15 @@ public:
     right = nullptr;
   }
 
-  virtual int child_count() const override { return 2; }
-  virtual ExpressionSqlNode *get_child(int index) const override {
+  int                 child_count() const override { return 2; }
+  ExpressionSqlNode *&get_child(int index) override
+  {
     if (index == 0) {
       return left;
     } else if (index == 1) {
       return right;
     }
-    return nullptr;
+    throw std::out_of_range("ArithmeticExpressionSqlNode has only 2 children");
   }
 };
 
@@ -94,10 +101,10 @@ public:
   ExpressionSqlNode *right = nullptr;
   CompOp             comp_op;
 
-  virtual bool operator==(const ExpressionSqlNode &other)  const override {
+  bool operator==(const ExpressionSqlNode &other) const override
+  {
     if (auto other_node = dynamic_cast<const ComparisonExpressionSqlNode *>(&other)) {
-      return (comp_op == other_node->comp_op) && (*left == *(other_node->left)) &&
-             (*right == *(other_node->right));
+      return (comp_op == other_node->comp_op) && (*left == *(other_node->left)) && (*right == *(other_node->right));
     }
     return false;
   }
@@ -110,14 +117,15 @@ public:
     right = nullptr;
   }
 
-  virtual int child_count() const override { return 2; }
-  virtual ExpressionSqlNode *get_child(int index) const override {
+  int                 child_count() const override { return 2; }
+  ExpressionSqlNode *&get_child(int index) override
+  {
     if (index == 0) {
       return left;
     } else if (index == 1) {
       return right;
     }
-    return nullptr;
+    throw std::out_of_range("ComparisonExpressionSqlNode has only 2 children");
   }
 };
 
@@ -128,7 +136,8 @@ public:
   ExpressionSqlNode *right = nullptr;
   ConjunctionType    conjunction_type;
 
-  virtual bool operator==(const ExpressionSqlNode &other)  const override {
+  bool operator==(const ExpressionSqlNode &other) const override
+  {
     if (auto other_node = dynamic_cast<const ConjunctionExpressionSqlNode *>(&other)) {
       return (conjunction_type == other_node->conjunction_type) && (*left == *(other_node->left)) &&
              (*right == *(other_node->right));
@@ -144,14 +153,15 @@ public:
     right = nullptr;
   }
 
-  virtual int child_count() const override { return 2; }
-  virtual ExpressionSqlNode *get_child(int index) const override {
+  int                 child_count() const override { return 2; }
+  ExpressionSqlNode *&get_child(int index) override
+  {
     if (index == 0) {
       return left;
     } else if (index == 1) {
       return right;
     }
-    return nullptr;
+    throw std::out_of_range("ConjunctionExpressionSqlNode has only 2 children");
   }
 };
 
@@ -161,7 +171,8 @@ public:
   AttrType           target_type;
   ExpressionSqlNode *child = nullptr;
 
-  virtual bool operator==(const ExpressionSqlNode &other)  const override {
+  bool operator==(const ExpressionSqlNode &other) const override
+  {
     if (auto other_node = dynamic_cast<const CastExpressionSqlNode *>(&other)) {
       return (target_type == other_node->target_type) && (*child == *(other_node->child));
     }
@@ -174,12 +185,13 @@ public:
     child = nullptr;
   }
 
-  virtual int child_count() const override { return 1; }
-  virtual ExpressionSqlNode *get_child(int index) const override {
+  int                 child_count() const override { return 1; }
+  ExpressionSqlNode *&get_child(int index) override
+  {
     if (index == 0) {
       return child;
     }
-    return nullptr;
+    throw std::out_of_range("CastExpressionSqlNode has only 1 child");
   }
 };
 
@@ -189,7 +201,8 @@ public:
   ExpressionSqlNode *child = nullptr;
   std::string        pattern;
 
-  virtual bool operator==(const ExpressionSqlNode &other)  const override {
+  bool operator==(const ExpressionSqlNode &other) const override
+  {
     if (auto other_node = dynamic_cast<const LikeExpressionSqlNode *>(&other)) {
       return (pattern == other_node->pattern) && (*child == *(other_node->child));
     }
@@ -202,12 +215,13 @@ public:
     child = nullptr;
   }
 
-  virtual int child_count() const override { return 1; }
-  virtual ExpressionSqlNode *get_child(int index) const override {
+  int                 child_count() const override { return 1; }
+  ExpressionSqlNode *&get_child(int index) override
+  {
     if (index == 0) {
       return child;
     }
-    return nullptr;
+    throw std::out_of_range("LikeExpressionSqlNode has only 1 child");
   }
 };
 
@@ -216,7 +230,8 @@ class NotExpressionSqlNode : public ExpressionSqlNode
 public:
   ExpressionSqlNode *child = nullptr;
 
-  virtual bool operator==(const ExpressionSqlNode &other)  const override {
+  bool operator==(const ExpressionSqlNode &other) const override
+  {
     if (auto other_node = dynamic_cast<const NotExpressionSqlNode *>(&other)) {
       return *child == *(other_node->child);
     }
@@ -229,12 +244,13 @@ public:
     child = nullptr;
   }
 
-  virtual int child_count() const override { return 1; }
-  virtual ExpressionSqlNode *get_child(int index) const override {
+  int                 child_count() const override { return 1; }
+  ExpressionSqlNode *&get_child(int index) override
+  {
     if (index == 0) {
       return child;
     }
-    return nullptr;
+    throw std::out_of_range("NotExpressionSqlNode has only 1 child");
   }
 };
 
@@ -244,7 +260,8 @@ public:
   std::string                      function_name;
   std::vector<ExpressionSqlNode *> param_exprs;
 
-  virtual bool operator==(const ExpressionSqlNode &other)  const override {
+  bool operator==(const ExpressionSqlNode &other) const override
+  {
     if (auto other_node = dynamic_cast<const FunctionExpressionSqlNode *>(&other)) {
       if (function_name != other_node->function_name) {
         return false;
@@ -271,23 +288,58 @@ public:
     param_exprs.clear();
   }
 
-  virtual int child_count() const override { return param_exprs.size(); }
-  virtual ExpressionSqlNode *get_child(int index) const override {
+  int                 child_count() const override { return param_exprs.size(); }
+  ExpressionSqlNode *&get_child(int index) override
+  {
     if (index < param_exprs.size()) {
       return param_exprs[index];
     }
-    return nullptr;
+    throw std::out_of_range("FunctionExpressionSqlNode has only " + std::to_string(param_exprs.size()) + " children");
+  }
+};
+
+class IsNullExpressionSqlNode : public ExpressionSqlNode
+{
+public:
+  ExpressionSqlNode *child = nullptr;
+
+  bool operator==(const ExpressionSqlNode &other) const override
+  {
+    if (auto other_node = dynamic_cast<const IsNullExpressionSqlNode *>(&other)) {
+      return *child == *(other_node->child);
+    }
+    return false;
+  }
+
+  int                 child_count() const override { return 1; }
+  ExpressionSqlNode *&get_child(int index) override
+  {
+    if (index == 0) {
+      return child;
+    }
+    throw std::out_of_range("IsNullExpressionSqlNode has only 1 child");
+  }
+
+  IsNullExpressionSqlNode() { ExpressionSqlNode::expr_type = ExprType::IS_NULL; }
+  ~IsNullExpressionSqlNode()
+  {
+    if (child) {
+      delete child;
+      child = nullptr;
+    }
   }
 };
 
 // 这个不是解析出来的，是在内部生成的
+// 因为聚合函数的名字不是关键字，所以最开始解析的时候会被当做普通函数
 class AggregateExpressionSqlNode : public ExpressionSqlNode
 {
 public:
   AggregateType      aggregate_type;
   ExpressionSqlNode *child = nullptr;
 
-  virtual bool operator==(const ExpressionSqlNode &other) const override{
+  bool operator==(const ExpressionSqlNode &other) const override
+  {
     if (auto other_node = dynamic_cast<const AggregateExpressionSqlNode *>(&other)) {
       return (aggregate_type == other_node->aggregate_type) && (*child == *(other_node->child));
     }
@@ -300,11 +352,37 @@ public:
     child = nullptr;
   }
 
-  virtual int child_count() const override { return 1; }
-  virtual ExpressionSqlNode *get_child(int index) const override {
+  int                 child_count() const override { return 1; }
+  ExpressionSqlNode *&get_child(int index) override
+  {
     if (index == 0) {
       return child;
     }
-    return nullptr;
+    throw std::out_of_range("AggregateExpressionSqlNode has only 1 child");
   }
+};
+
+// 这个不是解析出来的，是在内部生成的
+// 指向tuple中的一个cell
+class TupleCellExpressionSqlNode : public ExpressionSqlNode
+{
+public:
+  std::string table_name;
+  std::string field_name;
+  std::string alias;
+
+  virtual bool operator==(const ExpressionSqlNode &other) const override {
+    return false;
+  }
+
+  TupleCellExpressionSqlNode() { ExpressionSqlNode::expr_type = ExprType::CELL_REF; }
+
+  int child_count() const override { return 0; }
+
+  ExpressionSqlNode *&get_child(int index) override
+  {
+    throw std::out_of_range("TupleCellExpressionSqlNode has no child");
+  }
+
+  ~TupleCellExpressionSqlNode() = default;
 };

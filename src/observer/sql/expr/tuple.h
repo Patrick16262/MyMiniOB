@@ -129,10 +129,10 @@ public:
   RowTuple() = default;
   virtual ~RowTuple()
   {
-    for (FieldExpr *spec : speces_) {
+    for (FieldExpr *spec : fields_) {
       delete spec;
     }
-    speces_.clear();
+    fields_.clear();
   }
 
   void set_record(Record *record) { this->record_ = record; }
@@ -140,25 +140,23 @@ public:
   void set_schema(const Table *table, const std::vector<FieldMeta> *fields)
   {
     table_ = table;
-    // fix:join当中会多次调用右表的open,open当中会调用set_scheme，从而导致tuple当中会存储
-    // 很多无意义的field和value，因此需要先clear掉
-    this->speces_.clear();
-    this->speces_.reserve(fields->size());
+    this->fields_.clear();
+    this->fields_.reserve(fields->size());
     for (const FieldMeta &field : *fields) {
-      speces_.push_back(new FieldExpr(table, &field));
+      fields_.push_back(new FieldExpr(table, &field));
     }
   }
 
-  int cell_num() const override { return speces_.size(); }
+  int cell_num() const override { return fields_.size(); }
 
   RC cell_at(int index, Value &cell) const override
   {
-    if (index < 0 || index >= static_cast<int>(speces_.size())) {
+    if (index < 0 || index >= static_cast<int>(fields_.size())) {
       LOG_WARN("invalid argument. index=%d", index);
       return RC::INVALID_ARGUMENT;
     }
 
-    FieldExpr       *field_expr = speces_[index];
+    FieldExpr       *field_expr = fields_[index];
     const FieldMeta *field_meta = field_expr->field().meta();
     cell.set_type(field_meta->type());
     cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
@@ -173,8 +171,8 @@ public:
       return RC::NOTFOUND;
     }
 
-    for (size_t i = 0; i < speces_.size(); ++i) {
-      const FieldExpr *field_expr = speces_[i];
+    for (size_t i = 0; i < fields_.size(); ++i) {
+      const FieldExpr *field_expr = fields_[i];
       const Field     &field      = field_expr->field();
       if (0 == strcmp(field_name, field.field_name())) {
         return cell_at(i, cell);
@@ -202,7 +200,7 @@ public:
 private:
   Record                  *record_ = nullptr;
   const Table             *table_  = nullptr;
-  std::vector<FieldExpr *> speces_;
+  std::vector<FieldExpr *> fields_;
 };
 
 /**
@@ -391,10 +389,10 @@ public:
       return RC::NOTFOUND;
     }
 
-    const Value& value = aggr_values_[index];
+    const Value &value = aggr_values_[index];
 
     if (aggr_types_[index] == AggregateType::AVG) {
-      int count;
+      int   count;
       float sum;
       sscanf(value.get_string().c_str(), "count: %d, sum: %f", &count, &sum);
       cell.set_float(sum / count);
@@ -580,7 +578,8 @@ public:
     return tuple;
   }
 
-  std::vector<Expression *> group_exprs() {
+  std::vector<Expression *> group_exprs()
+  {
     std::vector<Expression *> exprs;
     for (const auto &expr : aggr_exprs_) {
       exprs.push_back(expr.get());
@@ -592,4 +591,84 @@ private:
   const std::vector<std::unique_ptr<Expression>> aggr_exprs_;
   const std::vector<AggregateType>               aggr_types_;
   const std::vector<TupleCellSpec>               aggr_specs_;
+};
+
+/**
+ * @brief 用于缓存元组
+ *
+ */
+
+class CacheTuple : public Tuple
+{
+public:
+  int cell_num() const override { return cell_specs_.size(); };
+
+  RC cell_at(int index, Value &cell) const override
+  {
+    if (index < 0 || index >= static_cast<int>(cells_.size())) {
+      return RC::NOTFOUND;
+    }
+    cell = cells_[index];
+    return RC::SUCCESS;
+  };
+
+  RC find_cell(const TupleCellSpec &spec, Value &cell) const override
+  {
+    const char *alias = spec.alias();
+    const char *table = spec.table_name();
+    const char *field = spec.field_name();
+
+    for (size_t i = 0; i < cell_specs_.size(); ++i) {
+      if (0 == strcmp(alias, cell_specs_[i].alias())) {
+        return cell_at(i, cell);
+      }
+    }
+
+    for (size_t i = 0; i < cell_specs_.size(); ++i) {
+      if (0 == strcmp(table, cell_specs_[i].table_name()) && 0 == strcmp(field, cell_specs_[i].field_name())) {
+        return cell_at(i, cell);
+      }
+    }
+
+    return RC::NOTFOUND;
+  };
+
+private:
+  friend class CacheTupleManager;
+  CacheTuple(std::vector<Value> cells, const std::vector<TupleCellSpec> &cell_specs)
+      : cells_(std::move(cells)), cell_specs_(cell_specs)
+  {}
+
+  const std::vector<Value>          cells_;
+  const std::vector<TupleCellSpec> &cell_specs_;
+};
+
+class CacheTupleManager
+{
+public:
+  CacheTupleManager(std::vector<TupleCellSpec> &cell_specs) : cell_specs_(std::move(cell_specs)) {}
+  RC cloneTuple(const Tuple &tuple, std::unique_ptr<Tuple> &cache) const
+  {
+    if (tuple.cell_num() != cell_specs_.size()) {
+      LOG_WARN("cell num not match. tuple cell num=%d, cell spec num=%d", tuple.cell_num(), cell_specs_.size());
+      return RC::INVALID_ARGUMENT;
+    }
+
+    std::vector<Value> cells;
+    for (int i = 0; i < tuple.cell_num(); i++) {
+      Value cell;
+      RC    rc = tuple.cell_at(i, cell);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("get cell failed. rc=%d", rc);
+        return rc;
+      }
+      cells.push_back(cell);
+    }
+
+    cache.reset(new CacheTuple(cells, cell_specs_));
+    return RC::SUCCESS;
+  }
+
+private:
+  const std::vector<TupleCellSpec> cell_specs_;
 };

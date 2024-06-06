@@ -25,6 +25,7 @@ RC try_to_get_bool_constant(std::unique_ptr<Expression> &expr, bool &constant_va
   }
   return RC::INTERNAL;
 }
+
 RC ConjunctionSimplificationRule::rewrite(std::unique_ptr<Expression> &expr, bool &change_made)
 {
   RC rc = RC::SUCCESS;

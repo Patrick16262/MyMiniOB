@@ -27,6 +27,7 @@ std::string physical_operator_type_name(PhysicalOperatorType type)
     case PhysicalOperatorType::PROJECT: return "PROJECT";
     case PhysicalOperatorType::STRING_LIST: return "STRING_LIST";
     case PhysicalOperatorType::GROUP: return "GROUP";
+    case PhysicalOperatorType::HASH_JOIN: return "HASH_JOIN";
     default: return "UNKNOWN";
   }
 }
