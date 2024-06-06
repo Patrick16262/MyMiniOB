@@ -10,30 +10,6 @@
 
 class Db;
 class SelectStmt;
-class TableStmt;
-
-/**
- * @brief TableStmt生成器，用于将sql语法树中的表引用节点转换为TableStmt对象
- * @note 该对象是有状态的一次性对象，不要重用
- *
- */
-
-class TableStmtGenerator
-{
-public:
-  RC create(Db *db, const std::vector<TableReferenceSqlNode *> table_sqls, TableStmt *&stmt);
-
-  std::vector<TableFactorDesc> &table_descs() { return table_descs_; }
-
-private:
-  RC create(Db *db, const TableReferenceSqlNode *table_sql, TableStmt *&stmt);
-  RC create(Db *db, const TablePrimarySqlNode *table_sql, TableStmt *&stmt);
-  RC create(Db *db, const TableSubquerySqlNode *table_sql, TableStmt *&stmt);
-  RC create(Db *db, const TableJoinSqlNode *table_sql, TableStmt *&stmt);
-
-private:
-  std::vector<TableFactorDesc> table_descs_;
-};
 
 /**
  * @brief 表
@@ -43,7 +19,7 @@ private:
 class TableStmt
 {
 public:
-  virtual ~TableStmt();
+  virtual ~TableStmt() = default;
 
   friend class TableStmtGenerator;
 
@@ -78,4 +54,27 @@ private:
   std::unique_ptr<TableStmt>  left_table_;
   std::unique_ptr<TableStmt>  right_table_;
   std::unique_ptr<Expression> join_condition_;
+};
+
+/**
+ * @brief TableStmt生成器，用于将sql语法树中的表引用节点转换为TableStmt对象
+ * @note 该对象是有状态的一次性对象，不要重用
+ *
+ */
+
+class TableStmtGenerator
+{
+public:
+  RC create(Db *db, const std::vector<TableReferenceSqlNode *> table_sqls, TableStmt *&stmt);
+
+  std::vector<TableFactorDesc> &table_descs() { return table_descs_; }
+
+private:
+  RC create(Db *db, const TableReferenceSqlNode *table_sql, TableStmt *&stmt);
+  RC create(Db *db, const TablePrimarySqlNode *table_sql, TableStmt *&stmt);
+  RC create(Db *db, const TableSubquerySqlNode *table_sql, TableStmt *&stmt);
+  RC create(Db *db, const TableJoinSqlNode *table_sql, TableStmt *&stmt);
+
+private:
+  std::vector<TableFactorDesc> table_descs_;
 };

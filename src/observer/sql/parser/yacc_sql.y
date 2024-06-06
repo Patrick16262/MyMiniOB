@@ -108,6 +108,7 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
   ParsedSqlNode *                           sql_node;
   Value *                                   value;
   RelAttrSqlNode *                          rel_attr;
+  SubqueryExpressionSqlNode *               subquery;
   std::vector<AttrInfoSqlNode> *            attr_infos;
   AttrInfoSqlNode *                         attr_info;
   ExpressionSqlNode *                       expression;
@@ -120,11 +121,13 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
   bool                                      booleans;
   ArithmeticType                            math_type;
   TableReferenceSqlNode *                   table_reference;
-  vector<TableReferenceSqlNode *> *         table_reference_list;
-  TableReferenceSqlNode *                   table_factor_node;
-  ExpressionWithOrderSqlNode *              order_by_node;
-  vector<ExpressionWithOrderSqlNode *> *    order_by_list;
-  OrderType                                 order_type;
+  std::vector<TableReferenceSqlNode *> *          table_reference_list;
+  TableReferenceSqlNode *                         table_factor_node;
+  ExpressionWithOrderSqlNode *                    order_by_node;
+  std::vector<ExpressionWithOrderSqlNode *> *     order_by_list;
+  ExpressionWithAliasSqlNode *                    expression_with_alias;
+  std::vector<ExpressionWithAliasSqlNode *> *     expression_with_alias_list;
+  OrderType                                       order_type;
 }
 
 
@@ -143,8 +146,8 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
 %type <attr_info>           attr_def
 %type <value_list>          value_list
 %type <expression>          opt_where
-%type <relation_list>       rel_list
 %type <expression>          expression
+%type <expression>          opt_join_condition
 %type <expression_list>     expression_list
 %type <sql_node>            calc_stmt
 %type <sql_node>            select_stmt
@@ -174,6 +177,7 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
 %type <order_by_node>       expression_with_order
 %type <order_by_list>       opt_order_by
 %type <order_by_list>       expression_with_order_list
+%type <subquery>            select_with_parenthesis
 %type <expression_list>     opt_group_by
 %type <expression>          opt_having
 // commands should be a list but I use a single command instead
@@ -181,6 +185,8 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
 %type <booleans>            opt_not
 %type <string>              opt_alias
 %type <order_type>          opt_order_type
+%type <expression_with_alias> query_expression
+%type <expression_with_alias_list> query_expression_list
 
 %nonassoc LIKE
 %left OR
@@ -453,7 +459,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     ;
 
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list opt_table_refs opt_where opt_group_by opt_having opt_order_by 
+    SELECT query_expression_list opt_table_refs opt_where opt_group_by opt_having opt_order_by 
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -480,6 +486,12 @@ select_stmt:        /*  select 语句的语法解析树*/
       }
     }
     ;
+
+select_with_parenthesis : LBRACE select_stmt RBRACE
+    {
+      $$ = new SubqueryExpressionSqlNode;
+      $$->subquery = $2;
+    }
 
 calc_stmt:
     CALC expression_list
@@ -544,8 +556,8 @@ expression:
       $$ = tmp;
       $$->name = token_name(sql_string, &@$);
     }
-    | LBRACE expression RBRACE {
-      $$ = $2;
+    | select_with_parenthesis {
+      $$ = $1;
 
       $$->name = token_name(sql_string, &@$);
     }
@@ -657,9 +669,9 @@ expression:
       $$ = tmp;
       $$->name = (token_name(sql_string, &@$));
     }
-    | EXISTS LBRACE select_stmt RBRACE {
+    | EXISTS select_with_parenthesis {
       ExistsExpressionSqlNode *tmp = new ExistsExpressionSqlNode;
-      tmp->subquery = $3->select_stmt->selection;
+      tmp->subquery = $2;
 
       $$ = tmp;
       $$->name = (token_name(sql_string, &@$));
@@ -667,7 +679,7 @@ expression:
     | expression opt_not IN LBRACE expression_list RBRACE {
       InExpressionSqlNode *tmp = new InExpressionSqlNode;
       tmp->child = $1;
-      tmp->values.swap(*$5);
+      tmp->value_list.swap(*$5);
       delete $5;
 
       $$ = tmp;
@@ -680,10 +692,10 @@ expression:
 
       $$->name = (token_name(sql_string, &@$));
     }
-    | expression opt_not IN LBRACE select_stmt RBRACE {
+    | expression opt_not IN select_with_parenthesis {
       InExpressionSqlNode *tmp = new InExpressionSqlNode;
       tmp->child = $1;
-      tmp->subquery = $5->selection;
+      tmp->subquery = $4;
 
       $$ = tmp;
 
@@ -701,7 +713,7 @@ expression:
 
       $$ = tmp;
 
-      if ($2) {
+      if ($3) {
         NotExpressionSqlNode* not_p = new NotExpressionSqlNode;
         not_p->child = $$;
         $$ = not_p;
@@ -761,22 +773,7 @@ rel_attr:
     }
     ;
 
-rel_list:
-    /* empty */
-    {
-      $$ = nullptr;
-    }
-    | COMMA ID rel_list {
-      if ($3 != nullptr) {
-        $$ = $3;
-      } else {
-        $$ = new std::vector<std::string>;
-      }
 
-      $$->push_back($2);
-      free($2);
-    }
-    ;
   
 opt_where:
     /* empty */
@@ -817,26 +814,40 @@ table_ref : table_factor opt_alias
       $$ = $1;
       if ($2 != nullptr) {
         $$->alias = $2;
-        delete $2;
+        free($2);
       }
     }
-    | table_ref JOIN table_factor ON expression 
+    | table_ref JOIN table_factor opt_alias opt_join_condition
     {
       TableJoinSqlNode *tmp = new TableJoinSqlNode;
       tmp->left = $1;
       tmp->right = $3;
-      tmp->condition = $5;
+      if ($4) {
+        tmp->right->alias = $4;
+      }
+      if ($5) {
+        tmp->condition = $5;
+      }
 
       $$ = tmp;
     }
 
+opt_join_condition : /*empty*/
+    {
+      $$ = nullptr;
+    }
+    | ON expression
+    {
+      $$ = $2;
+    }
 
-table_ref_list : table_factor
+
+table_ref_list : table_ref
     {
       $$ = new std::vector<TableReferenceSqlNode *>;
       $$->push_back($1);
     }
-    | table_factor COMMA table_ref_list
+    | table_ref COMMA table_ref_list
     {
       if ($3 != nullptr) {
         $$ = $3;
@@ -866,6 +877,33 @@ expression_with_order_list : expression_with_order
         $$ = $3;
       } else {
         $$ = new std::vector<ExpressionWithOrderSqlNode *>;
+      }
+      $$->insert($$->begin(), $1);
+    }
+
+query_expression: expression opt_alias
+    {
+      ExpressionWithAliasSqlNode *tmp = new ExpressionWithAliasSqlNode;
+      tmp->expr = $1;
+      if ($2 != nullptr) {
+        tmp->alias = $2;
+        free($2);
+      }
+
+      $$ = tmp;
+    }
+
+query_expression_list: query_expression
+    {
+      $$ = new std::vector<ExpressionWithAliasSqlNode *>;
+      $$->push_back($1);
+    }
+    | query_expression COMMA query_expression_list
+    {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new std::vector<ExpressionWithAliasSqlNode *>;
       }
       $$->insert($$->begin(), $1);
     }
@@ -955,7 +993,7 @@ opt_not: /*empty*/
     ;
 
 opt_alias: /*empty*/
-    {$$ = nullptr}
+    {$$ = nullptr;}
     | opt_as ID
     {
       $$ = $2;

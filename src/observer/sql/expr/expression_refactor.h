@@ -72,14 +72,14 @@ public:
 
   std::vector<std::unique_ptr<ExpressionSqlNode>> &aggregate_childs() { return aggregate_childs_; }
 
-  std::vector<std::unique_ptr<SelectSqlNode>> &subqueries()
+  std::vector<std::unique_ptr<SubqueryExpressionSqlNode>> &subqueries()
   {
     assert(subqueries_.size() == subquery_types_.size());
     return subqueries_;
   }
-  std::vector<SubqueryType> &subquery_types()  { return subquery_types_; }
+  std::vector<SubqueryType> &subquery_types() { return subquery_types_; }
 
-  std::vector<TupleCellSpec> &subquery_cells()  { return subquery_cells_; }
+  std::vector<TupleCellSpec> &subquery_cells() { return subquery_cells_; }
 
 private:
   RC refactor_internal(ExpressionSqlNode *&sql_node);
@@ -91,9 +91,9 @@ private:
   std::vector<AggregateType>                      aggregate_types_;
   std::vector<std::unique_ptr<ExpressionSqlNode>> aggregate_childs_;
 
-  std::vector<std::unique_ptr<SelectSqlNode>> subqueries_;
-  std::vector<SubqueryType>                   subquery_types_;
-  std::vector<TupleCellSpec>                  subquery_cells_;
+  std::vector<std::unique_ptr<SubqueryExpressionSqlNode>> subqueries_;
+  std::vector<SubqueryType>                               subquery_types_;
+  std::vector<TupleCellSpec>                              subquery_cells_;
 
   SubqueryType current_subquery_type_ = SubqueryType::SINGLE_CELL;
 

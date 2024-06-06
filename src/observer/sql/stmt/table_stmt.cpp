@@ -5,6 +5,7 @@
 #include "sql/parser/defs/expression_sql_defs.h"
 #include "sql/parser/defs/sql_node_fwd.h"
 #include "sql/parser/defs/sql_query_nodes.h"
+#include "sql/stmt/table_ref_desc.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 #include <cassert>
@@ -75,7 +76,7 @@ RC TableStmtGenerator::create(Db *db, const TablePrimarySqlNode *table_sql, Tabl
   string         relation_name = table_sql->relation_name;
   Table         *table         = db->find_table(relation_name.c_str());
   string         table_name    = table_sql->alias.empty() ? relation_name : table_sql->alias;
-  vector<string> field_names;
+  vector<FieldDesc> fields;
 
   if (table == nullptr) {
     LOG_WARN("table not exist: %s", relation_name.c_str());
@@ -83,10 +84,10 @@ RC TableStmtGenerator::create(Db *db, const TablePrimarySqlNode *table_sql, Tabl
   }
 
   for (auto &meta : *table->table_meta().field_metas()) {
-    field_names.push_back(meta.name());
+    fields.emplace_back(meta.name(), meta.visible());
   }
 
-  table_descs_.emplace_back(table_name, field_names, RelationType::TABLE);
+  table_descs_.emplace_back(table_name, fields, RelationType::TABLE);
 
   // everything are ok
   stmt              = new TableStmt();
@@ -102,7 +103,7 @@ RC TableStmtGenerator::create(Db *db, const TableSubquerySqlNode *table_sql, Tab
   SelectStmt    *subquery   = nullptr;
   Stmt         *&tmp        = *reinterpret_cast<Stmt **>(&subquery);
   string         table_name = table_sql->alias;
-  vector<string> field_names;
+  vector<FieldDesc> fields;
 
   if (table_name.empty()) {
     LOG_WARN("Every derived table must have its own alias");
@@ -116,12 +117,13 @@ RC TableStmtGenerator::create(Db *db, const TableSubquerySqlNode *table_sql, Tab
   }
 
   for (auto &attr : table_sql->subquery.attributes) {
-    field_names.push_back(attr->alias.empty()
+    fields.emplace_back(attr->alias.empty()
                               ? attr->expr->name
-                              : static_cast<FieldExpressionSqlNode *>(attr->expr)->field.attribute_name);
+                              : static_cast<FieldExpressionSqlNode *>(attr->expr)->field.attribute_name,
+                              true);
   }
 
-  table_descs_.emplace_back(table_name, field_names, RelationType::SELECT);
+  table_descs_.emplace_back(table_name.c_str(), fields, RelationType::SELECT);
 
   stmt        = new TableStmt();
   stmt->type_ = RelationType::SELECT;

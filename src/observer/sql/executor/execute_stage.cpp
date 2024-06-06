@@ -12,6 +12,8 @@ See the Mulan PSL v2 for more details. */
 // Created by Longda on 2021/4/13.
 //
 
+#include <cassert>
+#include <cstring>
 #include <string>
 
 #include "sql/executor/execute_stage.h"
@@ -64,9 +66,13 @@ RC ExecuteStage::handle_request_with_physical_operator(SQLStageEvent *sql_event)
   switch (stmt->type()) {
     case StmtType::SELECT: {
       SelectStmt *select_stmt = static_cast<SelectStmt *>(stmt);
-
-      for (const std::string &name : select_stmt->tuple_schema()) {
-        schema.append_cell(name.c_str());
+      for (const auto &tuple_cell : select_stmt->tuple_schema()) {
+#ifdef SCHEMA_WITH_TABLE_NAME
+        assert(false);
+        return RC::UNIMPLENMENT;
+#else
+        schema.append_cell(strlen(tuple_cell.alias()) == 0 ? tuple_cell.field_name() : tuple_cell.alias());
+#endif
       }
     } break;
 

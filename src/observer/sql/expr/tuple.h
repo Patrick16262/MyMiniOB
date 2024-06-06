@@ -20,6 +20,7 @@ See the Mulan PSL v2 for more details. */
 #include <json/value.h>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "common/log/log.h"
@@ -530,9 +531,9 @@ private:
 class AggregateTupleManager
 {
 public:
-  AggregateTupleManager(std::vector<std::unique_ptr<Expression>> &aggr_exprs, std::vector<AggregateType> &aggr_types,
-      std::vector<TupleCellSpec> &aggr_specs)
-      : aggr_exprs_(std::move(aggr_exprs)), aggr_types_(std::move(aggr_types)), aggr_specs_(std::move(aggr_specs))
+  AggregateTupleManager(std::vector<std::unique_ptr<Expression>> &aggr_exprs,
+      const std::vector<AggregateType> &aggr_types, const std::vector<TupleCellSpec> &aggr_specs)
+      : aggr_exprs_(std::move(aggr_exprs)), aggr_types_(aggr_types), aggr_specs_(aggr_specs)
   {
     assert(aggr_exprs.size() == aggr_types_.size() && aggr_types_.size() == aggr_specs_.size());
   }
@@ -567,6 +568,9 @@ public:
           initial_value = *group_by_it;
           group_by_it++;
         } break;
+        default: {
+          throw std::runtime_error("Invalid aggregate type");
+        }
       }
       tuple.aggr_values_.push_back(initial_value);
     }
@@ -588,9 +592,9 @@ public:
   }
 
 private:
-  const std::vector<std::unique_ptr<Expression>> aggr_exprs_;
-  const std::vector<AggregateType>               aggr_types_;
-  const std::vector<TupleCellSpec>               aggr_specs_;
+  std::vector<std::unique_ptr<Expression>> aggr_exprs_;
+  std::vector<AggregateType>               aggr_types_;
+  std::vector<TupleCellSpec>               aggr_specs_;
 };
 
 /**

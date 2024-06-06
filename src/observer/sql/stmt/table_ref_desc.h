@@ -9,24 +9,42 @@
 #include <vector>
 
 /**
+ * @brief 对字段的描述
+ *
+ */
+
+class FieldDesc
+{
+
+public:
+  FieldDesc(std::string field_names, bool visible) : field_name_(std::move(field_names)), visible(visible) {}
+  
+  std::string field_name() const { return field_name_; }
+  bool        get_visible() const { return visible; }
+
+private:
+  std::string field_name_;
+  bool        visible;
+};
+
+/**
  * @brief 对表的描述，会被用于expression对象生成中
  *
  */
 class TableFactorDesc
 {
 public:
-  TableFactorDesc(const std::string &table_name, std::vector<std::string> field_names, RelationType type)
-      : type_(type), table_name_(table_name), field_names_(std::move(field_names))
-  {}
+  TableFactorDesc(const std::string &table_name, std::vector<FieldDesc> field_names, RelationType type)
+      : type_(type), table_name_(table_name), field_names_(std::move(field_names)) {};
 
   RelationType             type() const { return type_; }
   std::string              table_name() const { return table_name_; }
-  std::vector<std::string> field_names() const { return field_names_; }
+  std::vector<FieldDesc> fields() const { return field_names_; }
 
 private:
   RelationType             type_;
   std::string              table_name_;
-  std::vector<std::string> field_names_;
+  std::vector<FieldDesc> field_names_;
 };
 
 /**
@@ -46,7 +64,7 @@ public:
   const TupleCellSpec         &child_spec() const { return child_spec_; }
 
 private:
-  AggregateType               type_;   // 聚合函数类型
-  std::unique_ptr<Expression> child_;  // 聚合函数的参数表达式
-  TupleCellSpec               child_spec_;   // 聚合函数参数的cell的名字
+  AggregateType               type_;        // 聚合函数类型
+  std::unique_ptr<Expression> child_;       // 聚合函数的参数表达式
+  TupleCellSpec               child_spec_;  // 聚合函数参数的cell的名字
 };

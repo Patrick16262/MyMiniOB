@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include <regex>
 #include <string>
 #include <unordered_set>
+#include <utility>
 
 #include "sql/expr/tuple_cell.h"
 #include "sql/parser/defs/comp_op.h"
@@ -328,7 +329,7 @@ class InExpr : Expression
 {
 public:
   InExpr(std::unique_ptr<Expression> &left, std::vector<std::unique_ptr<Expression>> &right)
-      : left_(std::move(left)), value_list_(right)
+      : left_(std::move(left)), value_list_(std::move(right))
   {}
   InExpr(std::unique_ptr<Expression> &left, std::unique_ptr<Expression> &subquery_ref)
       : left_(std::move(left)), subquery_ref_(std::move(subquery_ref))

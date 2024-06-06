@@ -48,6 +48,24 @@ public:
   static RC create(Db *db, const SelectSqlNode &select_sql, const std::vector<TupleCellSpec> outter_tuple,
       const std::vector<TableFactorDesc> outter_table, Stmt *&stmt);
 
+  std::vector<std::unique_ptr<Expression>>    &project_expr_list() { return project_expr_list_; }
+  std::vector<TupleCellSpec>                  &tuple_schema() { return tuple_schema_; }
+  std::unique_ptr<TableStmt>                  &table_stmt() { return table_stmt_; }
+  std::vector<std::unique_ptr<SubqueryStmt>>  &subquery_list() { return subquery_list_; }
+  std::vector<std::unique_ptr<AggregateDesc>> &aggregate_list() { return aggregate_list_; }
+  std::vector<std::unique_ptr<Expression>>    &group_by_list() { return group_by_list_; }
+  std::vector<std::unique_ptr<ExprWithOrder>> &order_by_list() { return order_by_list_; }
+  std::unique_ptr<Expression>                 &filter() { return filter_; }
+
+  const std::vector<std::unique_ptr<Expression>>    &project_expr_list() const { return project_expr_list_; }
+  const std::vector<TupleCellSpec>                  &tuple_schema() const { return tuple_schema_; }
+  const std::unique_ptr<TableStmt>                  &table_stmt() const { return table_stmt_; }
+  const std::vector<std::unique_ptr<SubqueryStmt>>  &subquery_list() const { return subquery_list_; }
+  const std::vector<std::unique_ptr<AggregateDesc>> &aggregate_list() const { return aggregate_list_; }
+  const std::vector<std::unique_ptr<Expression>>    &group_by_list() const { return group_by_list_; }
+  const std::vector<std::unique_ptr<ExprWithOrder>> &order_by_list() const { return order_by_list_; }
+  const std::unique_ptr<Expression>                 &filter() const { return filter_; }
+
 private:
   std::vector<std::unique_ptr<Expression>> project_expr_list_;  // 用于生成ProjectOperator
   std::vector<TupleCellSpec>               tuple_schema_;       // 显示的名字,

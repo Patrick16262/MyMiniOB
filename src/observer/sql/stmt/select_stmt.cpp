@@ -61,24 +61,24 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, const std::vector
    */
   for (auto *desc : select_sql.attributes) {
     if (!desc->alias.empty()) {
-      tuple_schema.emplace_back(desc->alias);
+      tuple_schema.emplace_back(desc->alias.c_str());
     }
     if (desc->expr->expr_type == ExprType::FIELD) {
       auto *field_expr = static_cast<FieldExpressionSqlNode *>(desc->expr);
-      tuple_schema.emplace_back(field_expr->field.relation_name, field_expr->field.attribute_name);
+      tuple_schema.emplace_back(field_expr->field.relation_name.c_str(), field_expr->field.attribute_name.c_str());
     } else {
-      tuple_schema.emplace_back(desc->expr->name);
+      tuple_schema.emplace_back(desc->expr->name.c_str());
     }
   }
 
   /**
    * 生成attribute_exprs
    */
-  vector<unique_ptr<Expression>>    attribute_exprs;
-  vector<ExpressionSqlNode *>       attributes_nodes;
-  vector<unique_ptr<SelectSqlNode>> subquery_sqls;
-  vector<SubqueryType>              subquery_types;
-  vector<TupleCellSpec>             subquery_cells;
+  vector<unique_ptr<Expression>>                attribute_exprs;
+  vector<ExpressionSqlNode *>                   attributes_nodes;
+  vector<unique_ptr<SubqueryExpressionSqlNode>> subquery_sqls;
+  vector<SubqueryType>                          subquery_types;
+  vector<TupleCellSpec>                         subquery_cells;
 
   QueryListGenerator query_list_generator(db, table_descs, outter_tuple, select_sql.group_by);
 
@@ -105,9 +105,9 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, const std::vector
   SubqueryStmtGenerator            subquery_stmt_generator(db, table_descs, tuple_schema);
   vector<unique_ptr<SubqueryStmt>> current_subquery_stmts;
 
-  vector<SelectSqlNode *>           subquery_ptr;
+  vector<SelectSqlNode *> subquery_ptr;
   for (auto &unique : subquery_sqls) {
-    subquery_ptr.push_back(unique.get());
+    subquery_ptr.push_back(&unique->subquery->selection);
   }
 
   rc = subquery_stmt_generator.create(subquery_ptr, subquery_types, subquery_cells, current_subquery_stmts);
@@ -150,7 +150,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, const std::vector
     return rc;
   }
 
-  subquery_sqls  = where_resolver.subquery_sqls();
+  subquery_sqls.swap(where_resolver.subquery_sqls());
   subquery_types = where_resolver.subquery_types();
   subquery_cells = where_resolver.subquery_cell_desc();
 
@@ -162,7 +162,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, const std::vector
 
   subquery_ptr.clear();
   for (auto &unique : subquery_sqls) {
-    subquery_ptr.push_back(unique.get());
+    subquery_ptr.push_back(&unique.get()->subquery->selection);
   }
 
   rc = subquery_stmt_generator.create(subquery_ptr, subquery_types, subquery_cells, current_subquery_stmts);
@@ -208,7 +208,7 @@ RC SubqueryStmtGenerator::create(
   Stmt         *subquery;
   SubqueryStmt *subquery_stmt;
 
-  rc = SelectStmt::create(db_, *subquery_sql, outter_tuple_schema_, , outter_table_descs_, subquery);
+  rc = SelectStmt::create(db_, *subquery_sql, outter_tuple_schema_, outter_table_descs_, subquery);
 
   if (rc != RC::SUCCESS) {
     LOG_WARN("Failed to create subquery stmt, rc=%s", strrc(rc));

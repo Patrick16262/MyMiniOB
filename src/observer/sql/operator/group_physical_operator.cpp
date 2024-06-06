@@ -85,6 +85,7 @@ RC GroupPhysicalOperator::close()
 {
   tuples_.clear();
   current_tuple_index_ = -1;
+  return RC::SUCCESS;
 }
 
 Tuple *GroupPhysicalOperator::current_tuple() {

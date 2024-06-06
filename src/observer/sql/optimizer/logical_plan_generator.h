@@ -21,7 +21,6 @@ See the Mulan PSL v2 for more details. */
 class Stmt;
 class CalcStmt;
 class SelectStmt;
-class FilterStmt;
 class InsertStmt;
 class DeleteStmt;
 class ExplainStmt;
@@ -38,7 +37,6 @@ public:
 private:
   RC create_plan(CalcStmt *calc_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
   RC create_plan(SelectStmt *select_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
-  RC create_plan(FilterStmt *filter_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
   RC create_plan(InsertStmt *insert_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
   RC create_plan(DeleteStmt *delete_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
   RC create_plan(ExplainStmt *explain_stmt, std::unique_ptr<LogicalOperator> &logical_operator);

@@ -29,8 +29,8 @@ public:
       : db_(db)
   {
     for (auto &desc : table_desc) {
-      for (auto &field : desc.field_names()) {
-        field_table_map_.insert({field, desc});
+      for (auto &field : desc.fields()) {
+        field_table_map_.insert({field.field_name(), desc});
       }
     }
     for (auto &cell : tuple_schema_) {
@@ -109,7 +109,7 @@ public:
   RC resolve(ExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr);
 
 public:
-  std::vector<std::unique_ptr<SelectSqlNode>> &subquery_sqls() { return refactor_.subqueries(); }
+  std::vector<std::unique_ptr<SubqueryExpressionSqlNode>> &subquery_sqls() { return refactor_.subqueries(); }
   std::vector<SubqueryType>                   &subquery_types() { return refactor_.subquery_types(); }
   std::vector<TupleCellSpec>                  &subquery_cell_desc() { return refactor_.subquery_cells(); }
 
@@ -140,10 +140,12 @@ public:
   QueryListGenerator() = default;
   QueryListGenerator(Db *db, std::vector<TableFactorDesc> table_desc, std::vector<TupleCellSpec> outter_tuple,
       std::vector<ExpressionSqlNode *> group_exprs)
-      : db_(db),
+      : generator_(db, table_desc, outter_tuple),
+        db_(db),
         table_desc_(std::move(table_desc)),
         outter_tuple_(std::move(outter_tuple)),
         group_exprs_(std::move(group_exprs))
+
   {
     assert(db_ != nullptr);
   }
@@ -152,22 +154,24 @@ public:
   RC generate_query_list(const vector<ExpressionSqlNode *> &sql_nodes, vector<unique_ptr<Expression>> &query_exprs);
 
 public:
-  std::vector<SubqueryType>              &subquery_types()  { return subquery_types_; }
-  std::vector<unique_ptr<SelectSqlNode>> &subquerys()  { return subquerys_; }
-  std::vector<TupleCellSpec>             &subquery_cell_desc()  { return subquery_cell_desc_; }
-  std::vector<unique_ptr<AggregateDesc>> &aggregate_desc()  { return aggregate_desc_; }
+  std::vector<SubqueryType>              &subquery_types() { return subquery_types_; }
+  std::vector<unique_ptr<SubqueryExpressionSqlNode>> &subquerys() { return subquerys_; }
+  std::vector<TupleCellSpec>             &subquery_cell_desc() { return subquery_cell_desc_; }
+  std::vector<unique_ptr<AggregateDesc>> &aggregate_desc() { return aggregate_desc_; }
 
 private:
   RC wildcard_fields(FieldExpressionSqlNode *wildcard_expression, vector<unique_ptr<Expression>> &query_exprs);
 
 private:
   std::vector<SubqueryType>              subquery_types_;
-  std::vector<unique_ptr<SelectSqlNode>> subquerys_;
+  std::vector<unique_ptr<SubqueryExpressionSqlNode>> subquerys_;
   std::vector<TupleCellSpec>             subquery_cell_desc_;
 
   std::vector<unique_ptr<AggregateDesc>> aggregate_desc_;
 
 private:
+  ExpressionGenerator generator_;
+
   Db                              *db_ = nullptr;
   std::vector<TableFactorDesc>     table_desc_;
   std::vector<TupleCellSpec>       outter_tuple_;

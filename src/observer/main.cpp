@@ -187,7 +187,7 @@ Copyright (c) 2021 OceanBase and/or its affiliates.
 Learn more about OceanBase at https://github.com/oceanbase/oceanbase
 Learn more about MiniOB at https://github.com/oceanbase/miniob
 
-DEBUF HAS BEEN ENABLED, PLEASE DO NOT USE IN PRODUCTION ENVIRONMENT
+DEBUG HAS BEEN ENABLED
 INVISIBLE FIELDS WILL BE PRINTED IN DEBUG MODE
 
 )";

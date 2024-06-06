@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <vector>
 #include "common/log/log.h"
+#include "sql/parser/parse_defs.h"
 
 using namespace std;
 
@@ -105,7 +106,7 @@ RC ExpressionStructValidator::validate(const ExpressionSqlNode *sql_node, State 
     } break;
     case ExprType::SUBQUERY: {
       const SubqueryExpressionSqlNode *subquery_node = static_cast<const SubqueryExpressionSqlNode *>(sql_node);
-      size_t                           attr_size     = subquery_node->subquery->attributes.size();
+      size_t                           attr_size     = subquery_node->subquery->selection.attributes.size();
       if (attr_size > 1 && !state.allow_multiple_col) {
         return RC::SUBQUERY_MORE_THAN_ONE_COL;
       }
@@ -117,6 +118,7 @@ RC ExpressionStructValidator::validate(const ExpressionSqlNode *sql_node, State 
     } break;
     default: {
       assert(false);
+      return RC::INTERNAL;
     } break;
   }
 }
@@ -193,8 +195,6 @@ RC ExpressionStructRefactor::refactor_internal(ExpressionSqlNode *&sql_node)
     case ExprType::ARITHMETIC:
     case ExprType::NOT:
     case ExprType::LIKE:
-    case ExprType::IN:
-    case ExprType::EXISTS:
     case ExprType::IS_NULL: {
       SubqueryType old_subquery_type = current_subquery_type_;
       SubqueryType new_subquery_type;
@@ -291,14 +291,18 @@ RC ExpressionStructRefactor::refactor_internal(ExpressionSqlNode *&sql_node)
       ref_expr->alias = tuple_cell.alias();
 
       // 由于在validator中已经验证过subquery的合法性，所以这里不再重复验证
-      subqueries_.emplace_back(subquery_node->subquery);
+      subqueries_.emplace_back(subquery_node);
       subquery_types_.push_back(current_subquery_type_);
       subquery_cells_.push_back(tuple_cell);
-      subquery_node->subquery = nullptr;
       sql_node                = ref_expr;
-      delete subquery_node;
 
       return RC::SUCCESS;
+    } break;
+    case ExprType::IN: {
+      assert(false);
+    }
+    case ExprType::EXISTS: {
+      assert(false);
     } break;
     default: {
       assert(false);

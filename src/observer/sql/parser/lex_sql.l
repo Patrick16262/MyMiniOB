@@ -111,7 +111,6 @@ ORDER                                   RETURN_TOKEN(ORDER);
 HAVING                                  RETURN_TOKEN(HAVING);
 AS                                      RETURN_TOKEN(AS);
 ASC                                     RETURN_TOKEN(ASC);
-DESC                                    RETURN_TOKEN(DESC);
 JOIN                                    RETURN_TOKEN(JOIN);
 SET                                     RETURN_TOKEN(SET);
 EXISTS                                  RETURN_TOKEN(EXISTS);
