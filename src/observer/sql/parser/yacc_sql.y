@@ -97,7 +97,7 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
         HAVING
         AS
         JOIN
-        IS
+        
         EXISTS
         IN
 
@@ -188,6 +188,7 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
 %type <expression_with_alias> query_expression
 %type <expression_with_alias_list> query_expression_list
 
+%left IS
 %nonassoc LIKE
 %left OR
 %left AND
@@ -643,6 +644,9 @@ expression:
       
       $$ = tmp;
       $$->name = (token_name(sql_string, &@$));
+    }
+    | LBRACE expression RBRACE {
+      $$ = $2;
     }
     | expression opt_not LIKE SSS {
       LikeExpressionSqlNode *tmp = new LikeExpressionSqlNode;

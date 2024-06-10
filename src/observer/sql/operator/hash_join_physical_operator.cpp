@@ -8,7 +8,7 @@
 
 using namespace std;
 
-RC HashJoinPhysicalOperator::open(Trx *trx)
+RC RbTreeJoinPhysicalOperator::open(Trx *trx)
 {
   assert(children_.size() == 2);
 
@@ -31,7 +31,7 @@ RC HashJoinPhysicalOperator::open(Trx *trx)
   return RC::SUCCESS;
 }
 
-RC HashJoinPhysicalOperator::next()
+RC RbTreeJoinPhysicalOperator::next()
 {
   RC rc;
 
@@ -54,7 +54,7 @@ RC HashJoinPhysicalOperator::next()
   return RC::RECORD_EOF;
 }
 
-RC HashJoinPhysicalOperator::close() {
+RC RbTreeJoinPhysicalOperator::close() {
   RC rc;
 
   if ((rc = left_table_->close()) != RC::SUCCESS) {
@@ -71,11 +71,11 @@ RC HashJoinPhysicalOperator::close() {
   return RC::SUCCESS;
 }
 
-Tuple *HashJoinPhysicalOperator::current_tuple() {
+Tuple *RbTreeJoinPhysicalOperator::current_tuple() {
   return &current_tuple_;
 }
 
-RC HashJoinPhysicalOperator::generate_hash_table()
+RC RbTreeJoinPhysicalOperator::generate_hash_table()
 {
   Value             value;
   unique_ptr<Tuple> cache;
@@ -107,7 +107,7 @@ RC HashJoinPhysicalOperator::generate_hash_table()
   return RC::SUCCESS;
 }
 
-RC HashJoinPhysicalOperator::fetch_next_tuple_in_table()
+RC RbTreeJoinPhysicalOperator::fetch_next_tuple_in_table()
 {
   RC rc;
   if ((rc = right_table_->next()) != RC::SUCCESS) {
@@ -128,7 +128,7 @@ RC HashJoinPhysicalOperator::fetch_next_tuple_in_table()
   return RC::SUCCESS;
 }
 
-RC HashJoinPhysicalOperator::fetch_next_tuple_in_range()
+RC RbTreeJoinPhysicalOperator::fetch_next_tuple_in_range()
 {
   eq_range_it_.first++;
 

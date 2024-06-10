@@ -1,3 +1,0 @@
-select age as ss_age, count(*), (select count(ss_age)) num from t_basic t1 join join_table_1 as t2 join join_table_2 as t3 where t1.name
-and t1.id IN (SELECT id FROM join_table_1 WHERE true)
-> 'c' group by age having age > 2 order by num ;

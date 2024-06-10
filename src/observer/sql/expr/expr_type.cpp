@@ -28,7 +28,7 @@ FunctionType common::get_function_type(const char *function_name)
 {
  stringstream ss;
  for (int i = 0; i < strlen(function_name); i++) {
-   ss << tolower(function_name[i]);
+   ss << (char) tolower(function_name[i]);
  }
 
  auto it = function_name_map.find(ss.str());

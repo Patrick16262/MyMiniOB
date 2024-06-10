@@ -34,7 +34,7 @@ end
 
 function event()
     local table_name = "sbtest" .. sysbench.rand.uniform(1, sysbench.opt.tables)
-        local k = sysbench.rand.default(1, sysbench.opt.table_size)
+    local k = sysbench.rand.default(1, sysbench.opt.table_size)
 
     con:query(string.format("DELETE FROM %s WHERE k=%d", table_name, k))
 

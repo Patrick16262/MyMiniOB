@@ -305,12 +305,12 @@ int Value::compare(const Value &other) const
   double first;
   double second;
 
-  if (attr_type_ == DATES || other.attr_type_ == CHARS) {
+  if (attr_type_ == DATES && other.attr_type_ == CHARS) {
     std::string str = other.get_string();
     tmp.set_date(str.c_str());
     first  = static_cast<double>(get_int());
     second = static_cast<double>(tmp.get_int());
-  } else if (attr_type_ == CHARS || other.attr_type_ == DATES) {
+  } else if (attr_type_ == CHARS && other.attr_type_ == DATES) {
     std::string str = get_string();
     tmp.set_date(str.c_str());
     first  = static_cast<double>(tmp.get_int());
@@ -484,8 +484,9 @@ double Value::get_double() const
     case NULLS: {
       throw bad_cast_exception();
     }
-    case UNDEFINED: {
+    default: {
       assert(false);
+      throw bad_cast_exception();
     }
   }
   return 0;

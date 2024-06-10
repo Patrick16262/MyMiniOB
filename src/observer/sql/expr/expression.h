@@ -16,9 +16,11 @@ See the Mulan PSL v2 for more details. */
 
 #include <memory>
 #include <regex>
+#include <set>
 #include <string>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
 #include "sql/expr/tuple_cell.h"
 #include "sql/parser/defs/comp_op.h"
@@ -325,13 +327,13 @@ private:
   AttrType      cell_value_type_;
 };
 
-class InExpr : Expression
+class InExpr :public Expression
 {
 public:
-  InExpr(std::unique_ptr<Expression> &left, std::vector<std::unique_ptr<Expression>> &right)
+  InExpr(std::unique_ptr<Expression> left, std::vector<std::unique_ptr<Expression>>& right)
       : left_(std::move(left)), value_list_(std::move(right))
   {}
-  InExpr(std::unique_ptr<Expression> &left, std::unique_ptr<Expression> &subquery_ref)
+  InExpr(std::unique_ptr<Expression> left, std::unique_ptr<Expression> subquery_ref)
       : left_(std::move(left)), subquery_ref_(std::move(subquery_ref))
   {}
 
@@ -341,6 +343,9 @@ public:
   RC       try_get_value(Value &value) const override;
   ExprType type() const override { return ExprType::IN; }
   AttrType value_type() const override { return BOOLEANS; }
+
+private:
+  RC is_in(const Value &left_value, const std::set<Value>& right_values, bool contain_null, Value &res) const;
 
 private:
   std::unique_ptr<Expression> left_;
@@ -364,11 +369,11 @@ private:
   std::unique_ptr<Expression> subquery_ref_;
 };
 
-class IsNullExpression : public Expression
+class IsNullExpr : public Expression
 {
 public:
-  IsNullExpression(std::unique_ptr<Expression> &child) : child_(std::move(child)) {}
-  virtual ~IsNullExpression() = default;
+  IsNullExpr(std::unique_ptr<Expression> child) : child_(std::move(child)) {}
+  virtual ~IsNullExpr() = default;
 
   RC       get_value(const Tuple &tuple, Value &value) const override;
   RC       try_get_value(Value &value) const override;

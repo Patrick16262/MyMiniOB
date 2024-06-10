@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include <memory>
 
 #include "common/rc.h"
+#include "sql/stmt/table_stmt.h"
 
 class Stmt;
 class CalcStmt;
@@ -36,6 +37,7 @@ public:
 
 private:
   RC create_plan(CalcStmt *calc_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
+  RC create_plan(TableStmt *table_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
   RC create_plan(SelectStmt *select_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
   RC create_plan(InsertStmt *insert_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
   RC create_plan(DeleteStmt *delete_stmt, std::unique_ptr<LogicalOperator> &logical_operator);

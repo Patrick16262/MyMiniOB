@@ -46,6 +46,7 @@ RC ExecuteStage::handle_request(SQLStageEvent *sql_event)
     rc = command_executor.execute(sql_event);
     session_event->sql_result()->set_return_code(rc);
   } else {
+    LOG_WARN("stmt is null");
     return RC::INTERNAL;
   }
   return rc;
@@ -67,12 +68,7 @@ RC ExecuteStage::handle_request_with_physical_operator(SQLStageEvent *sql_event)
     case StmtType::SELECT: {
       SelectStmt *select_stmt = static_cast<SelectStmt *>(stmt);
       for (const auto &tuple_cell : select_stmt->tuple_schema()) {
-#ifdef SCHEMA_WITH_TABLE_NAME
-        assert(false);
-        return RC::UNIMPLENMENT;
-#else
-        schema.append_cell(strlen(tuple_cell.alias()) == 0 ? tuple_cell.field_name() : tuple_cell.alias());
-#endif
+        schema.append_cell(tuple_cell);
       }
     } break;
 

@@ -20,65 +20,65 @@
 
 function init()
    assert(event ~= nil,
-          "this script is meant to be included by other OLTP scripts and " ..
-             "should not be called directly.")
+      "this script is meant to be included by other OLTP scripts and " ..
+      "should not be called directly.")
 end
 
 if sysbench.cmdline.command == nil then
    error("Command is required. Supported commands: prepare, warmup, run, " ..
-            "cleanup, help")
+      "cleanup, help")
 end
 
 -- Command line options
 sysbench.cmdline.options = {
    table_size =
-      {"Number of rows per table", 10000},
+   { "Number of rows per table", 10000 },
    range_size =
-      {"Range size for range SELECT queries", 100},
+   { "Range size for range SELECT queries", 100 },
    tables =
-      {"Number of tables", 1},
+   { "Number of tables", 1 },
    point_selects =
-      {"Number of point SELECT queries per transaction", 10},
+   { "Number of point SELECT queries per transaction", 10 },
    simple_ranges =
-      {"Number of simple range SELECT queries per transaction", 1},
+   { "Number of simple range SELECT queries per transaction", 1 },
    sum_ranges =
-      {"Number of SELECT SUM() queries per transaction", 1},
+   { "Number of SELECT SUM() queries per transaction", 1 },
    order_ranges =
-      {"Number of SELECT ORDER BY queries per transaction", 1},
+   { "Number of SELECT ORDER BY queries per transaction", 1 },
    distinct_ranges =
-      {"Number of SELECT DISTINCT queries per transaction", 1},
+   { "Number of SELECT DISTINCT queries per transaction", 1 },
    index_updates =
-      {"Number of UPDATE index queries per transaction", 1},
+   { "Number of UPDATE index queries per transaction", 1 },
    non_index_updates =
-      {"Number of UPDATE non-index queries per transaction", 1},
+   { "Number of UPDATE non-index queries per transaction", 1 },
    delete_inserts =
-      {"Number of DELETE/INSERT combinations per transaction", 1},
+   { "Number of DELETE/INSERT combinations per transaction", 1 },
    range_selects =
-      {"Enable/disable all range SELECT queries", true},
+   { "Enable/disable all range SELECT queries", true },
    auto_inc =
-   {"Use AUTO_INCREMENT column as Primary Key (for MySQL), " ..
-       "or its alternatives in other DBMS. When disabled, use " ..
-       "client-generated IDs", false},
+   { "Use AUTO_INCREMENT column as Primary Key (for MySQL), " ..
+   "or its alternatives in other DBMS. When disabled, use " ..
+   "client-generated IDs", false },
    create_table_options =
-      {"Extra CREATE TABLE options", ""},
+   { "Extra CREATE TABLE options", "" },
    skip_trx =
-      {"Don't start explicit transactions and execute all queries " ..
-          "in the AUTOCOMMIT mode", false},
+   { "Don't start explicit transactions and execute all queries " ..
+   "in the AUTOCOMMIT mode", false },
    secondary =
-      {"Use a secondary index in place of the PRIMARY KEY", false},
+   { "Use a secondary index in place of the PRIMARY KEY", false },
    create_secondary =
-      {"Create a secondary index in addition to the PRIMARY KEY", true},
+   { "Create a secondary index in addition to the PRIMARY KEY", true },
    reconnect =
-      {"Reconnect after every N events. The default (0) is to not reconnect",
-       0},
+   { "Reconnect after every N events. The default (0) is to not reconnect",
+      0 },
    mysql_storage_engine =
-      {"Storage engine, if MySQL is used", "miniob"},
+   { "Storage engine, if MySQL is used", "miniob" },
    pgsql_variant =
-      {"Use this PostgreSQL variant when running with the " ..
-          "PostgreSQL driver. The only currently supported " ..
-          "variant is 'redshift'. When enabled, " ..
-          "create_secondary is automatically disabled, and " ..
-          "delete_inserts is set to 0"}
+   { "Use this PostgreSQL variant when running with the " ..
+   "PostgreSQL driver. The only currently supported " ..
+   "variant is 'redshift'. When enabled, " ..
+   "create_secondary is automatically disabled, and " ..
+   "delete_inserts is set to 0" }
 }
 
 -- Prepare the dataset. This command supports parallel execution, i.e. will
@@ -89,7 +89,7 @@ function cmd_prepare()
 
    for i = sysbench.tid % sysbench.opt.threads + 1, sysbench.opt.tables,
    sysbench.opt.threads do
-     create_table(drv, con, i)
+      create_table(drv, con, i)
    end
 end
 
@@ -114,23 +114,23 @@ function cmd_warmup()
       print("Preloading table " .. t)
       con:query("ANALYZE TABLE sbtest" .. i)
       con:query(string.format(
-                   "SELECT AVG(id) FROM " ..
-                      "(SELECT * FROM %s FORCE KEY (PRIMARY) " ..
-                      "LIMIT %u) t",
-                   t, sysbench.opt.table_size))
+         "SELECT AVG(id) FROM " ..
+         "(SELECT * FROM %s FORCE KEY (PRIMARY) " ..
+         "LIMIT %u) t",
+         t, sysbench.opt.table_size))
       con:query(string.format(
-                   "SELECT COUNT(*) FROM " ..
-                      "(SELECT * FROM %s WHERE k LIKE '%%0%%' LIMIT %u) t",
-                   t, sysbench.opt.table_size))
+         "SELECT COUNT(*) FROM " ..
+         "(SELECT * FROM %s WHERE k LIKE '%%0%%' LIMIT %u) t",
+         t, sysbench.opt.table_size))
    end
 end
 
 -- Implement parallel prepare and warmup commands, define 'prewarm' as an alias
 -- for 'warmup'
 sysbench.cmdline.commands = {
-   prepare = {cmd_prepare, sysbench.cmdline.PARALLEL_COMMAND},
-   warmup = {cmd_warmup, sysbench.cmdline.PARALLEL_COMMAND},
-   prewarm = {cmd_warmup, sysbench.cmdline.PARALLEL_COMMAND}
+   prepare = { cmd_prepare, sysbench.cmdline.PARALLEL_COMMAND },
+   warmup = { cmd_warmup, sysbench.cmdline.PARALLEL_COMMAND },
+   prewarm = { cmd_warmup, sysbench.cmdline.PARALLEL_COMMAND }
 }
 
 
@@ -138,13 +138,13 @@ sysbench.cmdline.commands = {
 
 -- 10 groups, 119 characters
 local c_value_template = "###########-###########-###########-" ..
-   "###########-###########-###########-" ..
-   "###########-###########-###########-" ..
-   "###########"
+    "###########-###########-###########-" ..
+    "###########-###########-###########-" ..
+    "###########"
 
 -- 5 groups, 59 characters
 local pad_value_template = "###########-###########-###########-" ..
-   "###########-###########"
+    "###########-###########"
 
 function get_c_value()
    return sysbench.rand.string(c_value_template)
@@ -155,7 +155,7 @@ function get_pad_value()
 end
 
 function get_f_value()
-   return 1+sysbench.opt.table_size*sysbench.rand.uniform_double()
+   return 1 + sysbench.opt.table_size * sysbench.rand.uniform_double()
 end
 
 function create_table(drv, con, table_num)
@@ -170,7 +170,7 @@ CREATE TABLE sbtest%d(
   k INT,
   f FLOAT,
   c CHAR(120),
-  pad CHAR(60) 
+  pad CHAR(60)
 ) %s]],
       table_num,
       sysbench.opt.create_table_options)
@@ -179,7 +179,7 @@ CREATE TABLE sbtest%d(
 
    if (sysbench.opt.table_size > 0) then
       print(string.format("Inserting %d records into 'sbtest%d'",
-                          sysbench.opt.table_size, table_num))
+         sysbench.opt.table_size, table_num))
    end
 
    -- query = "INSERT INTO sbtest" .. table_num .. "(k, f, c, pad) VALUES"
@@ -192,14 +192,13 @@ CREATE TABLE sbtest%d(
    local f_val
 
    for i = 1, sysbench.opt.table_size do
-
       c_val = get_c_value()
       pad_val = get_pad_value()
       f_val = get_f_value()
 
       insert_sql = string.format("%s(%d, %f, '%s', '%s')",
-                              query, sysbench.rand.default(1, sysbench.opt.table_size),
-                              f_val, c_val, pad_val)    
+         query, sysbench.rand.default(1, sysbench.opt.table_size),
+         f_val, c_val, pad_val)
       con:query(insert_sql)
 
       -- con:bulk_insert_next(query)
@@ -209,9 +208,9 @@ CREATE TABLE sbtest%d(
 
    if sysbench.opt.create_secondary then
       print(string.format("Creating a secondary index on 'sbtest%d'...",
-                          table_num))
+         table_num))
       con:query(string.format("CREATE INDEX k_%d ON sbtest%d(k)",
-                              table_num, table_num))
+         table_num, table_num))
    end
 end
 
@@ -219,31 +218,31 @@ local t = sysbench.sql.type
 local stmt_defs = {
    point_selects = {
       "SELECT c FROM sbtest%u WHERE id=?",
-      t.INT},
+      t.INT },
    simple_ranges = {
       "SELECT c FROM sbtest%u WHERE id BETWEEN ? AND ?",
-      t.INT, t.INT},
+      t.INT, t.INT },
    sum_ranges = {
       "SELECT SUM(k) FROM sbtest%u WHERE id BETWEEN ? AND ?",
-       t.INT, t.INT},
+      t.INT, t.INT },
    order_ranges = {
       "SELECT c FROM sbtest%u WHERE id BETWEEN ? AND ? ORDER BY c",
-       t.INT, t.INT},
+      t.INT, t.INT },
    distinct_ranges = {
       "SELECT DISTINCT c FROM sbtest%u WHERE id BETWEEN ? AND ? ORDER BY c",
-      t.INT, t.INT},
+      t.INT, t.INT },
    index_updates = {
       "UPDATE sbtest%u SET k=k+1 WHERE id=?",
-      t.INT},
+      t.INT },
    non_index_updates = {
       "UPDATE sbtest%u SET c=? WHERE id=?",
-      {t.CHAR, 120}, t.INT},
+      { t.CHAR, 120 }, t.INT },
    deletes = {
       "DELETE FROM sbtest%u WHERE id=?",
-      t.INT},
+      t.INT },
    inserts = {
       "INSERT INTO sbtest%u (id, k, c, pad) VALUES (?, ?, ?, ?)",
-      t.INT, t.INT, {t.CHAR, 120}, {t.CHAR, 60}},
+      t.INT, t.INT, { t.CHAR, 120 }, { t.CHAR, 60 } },
 }
 
 function prepare_begin()
@@ -265,7 +264,7 @@ function prepare_for_each_table(key)
       end
 
       for p = 1, nparam do
-         local btype = stmt_defs[key][p+1]
+         local btype = stmt_defs[key][p + 1]
          local len
 
          if type(btype) == "table" then
@@ -273,8 +272,8 @@ function prepare_for_each_table(key)
             btype = btype[1]
          end
          if btype == sysbench.sql.type.VARCHAR or
-            btype == sysbench.sql.type.CHAR then
-               param[t][key][p] = stmt[t][key]:bind_create(btype, len)
+             btype == sysbench.sql.type.CHAR then
+            param[t][key][p] = stmt[t][key]:bind_create(btype, len)
          else
             param[t][key][p] = stmt[t][key]:bind_create(btype)
          end
@@ -364,7 +363,7 @@ function cleanup()
 
    for i = 1, sysbench.opt.tables do
       print(string.format("Dropping table 'sbtest%d'...", i))
-      con:query("DROP TABLE IF EXISTS sbtest" .. i )
+      con:query("DROP TABLE IF EXISTS sbtest" .. i)
    end
 end
 
@@ -468,9 +467,9 @@ end
 -- the listed error codes are in the --mysql-ignore-errors list
 function sysbench.hooks.before_restart_event(errdesc)
    if errdesc.sql_errno == 2013 or -- CR_SERVER_LOST
-      errdesc.sql_errno == 2055 or -- CR_SERVER_LOST_EXTENDED
-      errdesc.sql_errno == 2006 or -- CR_SERVER_GONE_ERROR
-      errdesc.sql_errno == 2011    -- CR_TCP_CONNECTION
+       errdesc.sql_errno == 2055 or -- CR_SERVER_LOST_EXTENDED
+       errdesc.sql_errno == 2006 or -- CR_SERVER_GONE_ERROR
+       errdesc.sql_errno == 2011   -- CR_TCP_CONNECTION
    then
       close_statements()
       prepare_statements()
@@ -487,4 +486,3 @@ function check_reconnect()
       end
    end
 end
-

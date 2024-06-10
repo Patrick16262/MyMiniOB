@@ -13,7 +13,7 @@ using namespace std;
 RC GroupPhysicalOperator::open(Trx *trx)
 {
   assert(children_.size() == 1);
-  unordered_map<vector<Value>, AggregateTuple> grouped_tuples;
+  map<vector<Value>, AggregateTuple> grouped_tuples;
   vector<Value>                                current_group_by_values;
   Tuple                                       *tuple = nullptr;
   PhysicalOperator                            *child = children_[0].get();

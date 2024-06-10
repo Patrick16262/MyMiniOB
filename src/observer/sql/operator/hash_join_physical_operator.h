@@ -20,7 +20,7 @@
  *          同时，当时只有在expr(left_field) = expr(right_field)时才能使用hashjoin
  */
 
-class HashJoinPhysicalOperator : public PhysicalOperator
+class RbTreeJoinPhysicalOperator : public PhysicalOperator
 {
 public:
   virtual PhysicalOperatorType type() const override { return PhysicalOperatorType::HASH_JOIN; };
@@ -37,13 +37,13 @@ private:
   RC fetch_next_tuple_in_range();
 
 private:
-  PhysicalOperator                                      *left_table_;
-  PhysicalOperator                                      *right_table_;
-  std::unordered_multimap<Value, std::unique_ptr<Tuple>> left_hash_table_;
-  decltype(left_hash_table_.equal_range(Value()))        eq_range_it_;
-  std::unique_ptr<Expression>                            left_expr_;
-  std::unique_ptr<Expression>                            right_expr_;
-  CacheTupleManager                                      cache_manager_;
-  Trx                                                   *trx_;
-  JoinedTuple                                            current_tuple_;
+  PhysicalOperator                               *left_table_;
+  PhysicalOperator                               *right_table_;
+  std::multimap<Value, std::unique_ptr<Tuple>>    left_hash_table_;
+  decltype(left_hash_table_.equal_range(Value())) eq_range_it_;
+  std::unique_ptr<Expression>                     left_expr_;
+  std::unique_ptr<Expression>                     right_expr_;
+  CacheTupleManager                               cache_manager_;
+  Trx                                            *trx_;
+  JoinedTuple                                     current_tuple_;
 };

@@ -20,7 +20,11 @@
                 "disk"
             ],
             "cwd": "${workspaceFolder}/${defaultBuildTask}/",
-            "preLaunchTask": "${defaultBuildTask}"
+            "preLaunchTask": "${defaultBuildTask}",
+            "terminal": "integrated",
+            "presentation": {
+                "clear": true
+            }
         }
     ]
 }

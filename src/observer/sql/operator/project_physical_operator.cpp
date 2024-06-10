@@ -14,11 +14,17 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/operator/project_physical_operator.h"
 #include "common/log/log.h"
+#include "sql/expr/tuple.h"
 #include "storage/table/table.h"
+
+using namespace std;
+
+Tuple *fake_tuple = new ValueListTuple;
 
 RC ProjectPhysicalOperator::open(Trx *trx)
 {
   if (children_.empty()) {
+    LOG_INFO("const select operator, no need to open child operator");
     return RC::SUCCESS;
   }
 
@@ -35,21 +41,38 @@ RC ProjectPhysicalOperator::open(Trx *trx)
 RC ProjectPhysicalOperator::next()
 {
   if (children_.empty()) {
-    return RC::RECORD_EOF;
+    if (!const_eof_) {
+      const_eof_ = true;
+      return RC::SUCCESS;
+    } else {
+      return RC::RECORD_EOF;
+    }
+  } else {
+    return children_[0]->next();
   }
-  return children_[0]->next();
 }
 
 RC ProjectPhysicalOperator::close()
 {
-  if (!children_.empty()) {
-    children_[0]->close();
+  RC rc;
+  if (children_.empty()) {
+    
+  } else {
+    rc = children_[0]->close();
+    if (rc != RC::SUCCESS) {
+      string child_name = children_[0]->name().c_str();
+      LOG_WARN("failed to close child operator: rc=%s, child=%s", strrc(rc),child_name.c_str() );
+      return rc;
+    }
   }
   return RC::SUCCESS;
 }
 Tuple *ProjectPhysicalOperator::current_tuple()
 {
-  tuple_.set_tuple(children_[0]->current_tuple());
+  if (children_.empty()) {
+    tuple_.set_tuple(fake_tuple);
+  } else {
+    tuple_.set_tuple(children_[0]->current_tuple());
+  }
   return &tuple_;
 }
-

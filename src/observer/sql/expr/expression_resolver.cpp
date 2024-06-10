@@ -7,6 +7,7 @@
 #include "sql/expr/tuple_cell.h"
 #include "sql/parser/defs/expression_sql_defs.h"
 #include "sql/parser/defs/sql_node_fwd.h"
+#include "sql/parser/defs/sql_query_nodes.h"
 #include "sql/parser/value.h"
 #include "sql/stmt/table_ref_desc.h"
 #include "storage/db/db.h"
@@ -118,7 +119,7 @@ RC ExpressionGenerator::generate_expression(const FieldExpressionSqlNode *sql_no
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  if (matched_tables.empty() == 0) {
+  if (matched_tables.empty()) {
     LOG_WARN("field not found: %s", attr_name.c_str());
     return RC::SCHEMA_FIELD_MISSING;
   }
@@ -373,20 +374,65 @@ RC ExpressionGenerator::generate_expression(
 RC ExpressionGenerator::generate_expression(
     const TupleCellExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr)
 {
-  assert(false);
-  return RC::UNIMPLENMENT;
+  expr.reset(new TupleCellExpr(
+      TupleCellSpec(sql_node->table_name.c_str(), sql_node->field_name.c_str(), sql_node->alias.c_str())));
+  expr->set_name(sql_node->name);
+  return RC::SUCCESS;
 }
 
 RC ExpressionGenerator::generate_expression(const IsNullExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr)
 {
-  assert(false);
-  return RC::UNIMPLENMENT;
+  std::unique_ptr<Expression> child;
+
+  RC rc = generate_expression(sql_node->child, child);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("generate child expression failed");
+    return rc;
+  }
+
+  expr.reset(new IsNullExpr(std::move(child)));
+  expr->set_name(sql_node->name);
+  return RC::SUCCESS;
 }
 
 RC ExpressionGenerator::generate_expression(const InExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr)
 {
-  assert(false);
-  return RC::UNIMPLENMENT;
+  std::unique_ptr<Expression>         child    = nullptr;
+  std::unique_ptr<Expression>         subquery = nullptr;  // 如果是子查询，这个字段不为空，反正为空
+  std::vector<unique_ptr<Expression>> value_list;
+
+  RC rc = generate_expression(sql_node->child, child);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("generate left expression failed");
+    return rc;
+  }
+
+  if (sql_node->subquery) {
+    assert(sql_node->value_list.size() == 0);
+    rc = generate_expression(sql_node->subquery, subquery);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("generate subquery expression failed");
+      return rc;
+    }
+
+    expr.reset(new InExpr(std::move(child), std::move(subquery)));
+    expr->set_name(sql_node->name);
+    return RC::SUCCESS;
+  } else {
+    for (auto *value : sql_node->value_list) {
+      unique_ptr<Expression> value_expr;
+      rc = generate_expression(value, value_expr);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("generate value expression failed");
+        return rc;
+      }
+      value_list.push_back(std::move(value_expr));
+    }
+
+    expr.reset(new InExpr(std::move(child), value_list));
+    expr->set_name(sql_node->name);
+    return RC::SUCCESS;
+  }
 }
 
 RC ExpressionGenerator::generate_expression(const ExistsExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr)
@@ -435,8 +481,8 @@ RC WhereConditionExpressionResolver::resolve(ExpressionSqlNode *sql_node, std::u
 /**
  * @brief 查询列表生成器
  */
-RC QueryListGenerator::generate_query_list(
-    const vector<ExpressionSqlNode *> &sql_nodes, vector<unique_ptr<Expression>> &query_exprs)
+RC ProjectExpressionResovler::generate_query_list(
+    const vector<ExpressionWithAliasSqlNode *> &sql_nodes, vector<unique_ptr<Expression>> &query_exprs)
 {
   vector<unique_ptr<Expression>> tmp_exprs;
   FieldExpressionSqlNode        *tmp_wildcard_expression = nullptr;
@@ -444,12 +490,11 @@ RC QueryListGenerator::generate_query_list(
 
   query_exprs.clear();
   for (auto *sql_node : sql_nodes) {
+    if (sql_node->expr->expr_type == ExprType::FIELD &&
+        (tmp_wildcard_expression = static_cast<FieldExpressionSqlNode *>(sql_node->expr))->field.attribute_name ==
+            "*") {
 
-    if (sql_node->expr_type == ExprType::FIELD &&
-        (tmp_wildcard_expression = static_cast<FieldExpressionSqlNode *>(sql_node))->field.attribute_name == "*") {
       // 如果是通配符的话
-      tmp_exprs.clear();
-
       rc = wildcard_fields(tmp_wildcard_expression, tmp_exprs);
       if (rc != RC::SUCCESS) {
         LOG_WARN("wildcard fields failed");
@@ -458,13 +503,14 @@ RC QueryListGenerator::generate_query_list(
 
       query_exprs.insert(
           query_exprs.end(), std::make_move_iterator(tmp_exprs.begin()), std::make_move_iterator(tmp_exprs.end()));
-
+      tmp_exprs.clear();
     } else {
+
       // 普通的表达式
       unique_ptr<Expression>   expr;
       ExpressionStructRefactor refactor;
-      refactor.refactor(sql_node);
-      rc = generator_.generate_expression(sql_node, expr);
+      refactor.refactor(sql_node->expr);
+      rc = generator_.generate_expression(sql_node->expr, expr);
       if (rc != RC::SUCCESS) {
         LOG_WARN("generate expression failed");
         return rc;
@@ -477,6 +523,19 @@ RC QueryListGenerator::generate_query_list(
       subquerys_.insert(subquerys_.end(),
           std::make_move_iterator(refactor.subqueries().begin()),
           std::make_move_iterator(refactor.subqueries().end()));
+
+      // 生成tuple_schema
+      FieldExpressionSqlNode *field = dynamic_cast<FieldExpressionSqlNode *>(sql_node->expr);
+      if (field) {
+        attr_tuple_.emplace_back(
+            field->field.relation_name.c_str(), field->field.attribute_name.c_str(), sql_node->alias.c_str());
+      } else {
+        if (sql_node->alias.c_str()) {
+          attr_tuple_.emplace_back(sql_node->alias.c_str());
+        } else {
+          attr_tuple_.emplace_back(sql_node->expr->name.c_str());
+        }
+      }
     }
   }
 
@@ -486,7 +545,7 @@ RC QueryListGenerator::generate_query_list(
 /**
  * @brief 通配符字段处理
  */
-RC QueryListGenerator::wildcard_fields(
+RC ProjectExpressionResovler::wildcard_fields(
     FieldExpressionSqlNode *wildcard_expression, vector<unique_ptr<Expression>> &query_exprs)
 {
   query_exprs.clear();
@@ -506,8 +565,16 @@ RC QueryListGenerator::wildcard_fields(
         temp_node->field.attribute_name = field.field_name();
         temp_node->field.relation_name  = table_desc.table_name();
         temp_node->name                 = field.field_name();
-        generator_.generate_expression(static_cast<ExpressionSqlNode *>(temp_node), expr);
+        rc = generator_.generate_expression(static_cast<ExpressionSqlNode *>(temp_node), expr);
+        if (rc != RC::SUCCESS) {
+          LOG_WARN("generate wildcard expression failed, rc=%d:%s", rc, strrc(rc));
+          return rc;
+        }
+
         query_exprs.push_back(std::move(expr));
+        delete temp_node;
+
+        attr_tuple_.emplace_back(table_desc.table_name().c_str(), field.field_name().c_str());
       }
     }
   } else {
@@ -525,7 +592,6 @@ RC QueryListGenerator::wildcard_fields(
           temp_node->field.attribute_name = field.field_name();
           temp_node->field.relation_name  = table_desc.table_name();
           temp_node->name                 = field.field_name();
-
           rc = generator_.generate_expression(static_cast<ExpressionSqlNode *>(temp_node), expr);
           if (rc != RC::SUCCESS) {
             LOG_WARN("generate wildcard expression failed, rc=%d:%s", rc, strrc(rc));

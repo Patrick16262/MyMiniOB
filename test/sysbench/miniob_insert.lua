@@ -22,7 +22,7 @@
 require("miniob_common")
 
 sysbench.cmdline.commands.prepare = {
-   function ()
+   function()
       cmd_prepare()
    end,
    sysbench.cmdline.PARALLEL_COMMAND
@@ -41,10 +41,9 @@ function event()
    local f_val = get_f_value()
 
    con:query(string.format("INSERT INTO %s VALUES " ..
-                              "(%d, %f, '%s', '%s')",
-                           table_name, k_val, f_val, c_val, pad_val))
+      "(%d, %f, '%s', '%s')",
+      table_name, k_val, f_val, c_val, pad_val))
 
 
    check_reconnect()
 end
-

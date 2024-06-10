@@ -200,9 +200,6 @@ RC ExpressionStructRefactor::refactor_internal(ExpressionSqlNode *&sql_node)
       SubqueryType new_subquery_type;
       if (sql_node->expr_type == ExprType::EXISTS) {
         new_subquery_type = SubqueryType::EXISTS;
-      }
-      if (sql_node->expr_type == ExprType::IN) {
-        new_subquery_type = SubqueryType::SINGLE_COL;
       } else {
         new_subquery_type = SubqueryType::SINGLE_CELL;
       }
@@ -294,18 +291,59 @@ RC ExpressionStructRefactor::refactor_internal(ExpressionSqlNode *&sql_node)
       subqueries_.emplace_back(subquery_node);
       subquery_types_.push_back(current_subquery_type_);
       subquery_cells_.push_back(tuple_cell);
-      sql_node                = ref_expr;
+      sql_node = ref_expr;
 
       return RC::SUCCESS;
     } break;
+
     case ExprType::IN: {
-      assert(false);
-    }
+      InExpressionSqlNode *in_node = static_cast<InExpressionSqlNode *>(sql_node);
+      RC                   rc;
+
+      if (in_node->subquery) {
+        assert(in_node->value_list.empty());
+
+        SubqueryType old_subquery_type = current_subquery_type_;
+        current_subquery_type_         = SubqueryType::SINGLE_COL;
+        rc                             = refactor_internal(*reinterpret_cast<ExpressionSqlNode **>(&in_node->subquery));
+        current_subquery_type_         = old_subquery_type;
+
+        if (rc != RC::SUCCESS) {
+          LOG_WARN("Failed to refactor expression struct, rc=%d:%s", rc, strrc(rc));
+          return rc;
+        }
+      } else {
+        SubqueryType old_subquery_type = current_subquery_type_;
+        current_subquery_type_         = SubqueryType::SINGLE_CELL;
+        for (auto &value : in_node->value_list) {
+          rc = refactor_internal(value);
+          if (rc != RC::SUCCESS) {
+            LOG_WARN("Failed to refactor expression struct, rc=%d:%s", rc, strrc(rc));
+            return rc;
+          }
+        }
+        current_subquery_type_ = old_subquery_type;
+      }
+      return RC::SUCCESS;
+    } break;
+
     case ExprType::EXISTS: {
-      assert(false);
+      ExistsExpressionSqlNode *exists_node = static_cast<ExistsExpressionSqlNode *>(sql_node);
+
+      SubqueryType old_subquery_type = current_subquery_type_;
+      current_subquery_type_         = SubqueryType::EXISTS;
+      RC rc                  = refactor_internal(*reinterpret_cast<ExpressionSqlNode **>(&exists_node->subquery));
+      current_subquery_type_ = old_subquery_type;
+
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("Failed to refactor expression struct, rc=%d:%s", rc, strrc(rc));
+        return rc;
+      }
+      return RC::SUCCESS;
     } break;
     default: {
       assert(false);
+      return RC::UNIMPLENMENT;
     } break;
   }
 }

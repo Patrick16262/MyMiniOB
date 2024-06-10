@@ -1,0 +1,172 @@
+1. query simple expr
+
+// unimplimented
+// select true ;
+// true
+// 1
+
+select 1, 2, 3;
+1 | 2 | 3
+1 | 2 | 3
+
+select 1 + 2 - 3+4;
+1 + 2 - 3+4
+4
+
+select 2* 4;
+2* 4
+8
+
+select 3/2;
+3/2
+1.5
+
+select 2* (1+3);
+2* (1+3)
+8
+
+select (1+3) *2;
+(1+3) *2
+8
+
+select 2 *-(10+2);
+2 *-(10+2)
+-24
+
+select (1+2) * (2 * (20+-(5*1)));
+(1+2) * (2 * (20+-(5*1)))
+90
+
+select 20/0;
+20/0
+NULL
+
+select 13.2/0.0;
+13.2/0.0
+NULL
+
+select "123" + 4;
+"123" + 4
+127
+
+select "abc" + 4;
+"abc" + 4
+4
+
+
+2. query complex expr
+
+select 1 as f1, (2 + 1) * 3 as f2;
+f1 | f2
+1 | 9
+
+select 1 in ((100 - 50 )*0 + 1 , 2) , 0 in ( 'hello_world') is_hello_world;
+1 in ((100 - 50 )*0 + 1 , 2) | is_hello_world
+1 | 1
+
+select 'bad_cast' in (null, 'bad_cast', 2);
+'bad_cast' in (null, 'bad_cast', 2)
+1
+
+select 'alloc' in ('malloc', 'alloc', 'realloc'), 100 in ('px100'), 4 in (1, 2, 3, 5);
+'alloc' in ('malloc', 'alloc', 'realloc') | 100 in ('px100') | 4 in (1, 2, 3, 5)
+1 | 0 | 0
+
+select 'bad_cast' in (null), 200 in ('200px');
+'bad_cast' in (null) | 200 in ('200px')
+NULL | 1
+
+select null in (null, 'if', 'das', 0);
+null in (null, 'if', 'das', 0)
+NULL
+
+select 'aetihsfjkgainoewfl' in (null, 'aetihsfjkgainoewfl') some_field, 'aefsd' in (0);
+some_field | 'aefsd' in (0)
+1 | 1
+
+select null is null is_null;
+is_null
+1
+
+select 0 is null someNil;
+someNil
+0
+
+select (null > 1) and (3 = 3) as test_and;
+test_and
+NULL
+
+select (null * 3) or (1 + 1) test_or;
+test_or
+1
+
+select (null < 1) + 1 is null;
+(null < 1) + 1 is null
+1
+
+3. query const function
+
+SELECT DATE_FORMAT('2023-02-15', '%Y/%m/%d') as formatted_date;
+formatted_date
+2023/02/15
+
+SELECT DATE_FORMAT('1998-11-25', '%d-%b-%Y') as formatted_date;
+formatted_date
+25-Nov-1998
+
+SELECT DATE_FORMAT('2022-09-30', '%M %e, %Y') as formatted_date;
+formatted_date
+September 30, 2022
+
+SELECT DATE_FORMAT('2024-05-10', '%W, %M %e, %Y') as formatted_date;
+formatted_date
+Friday, May 10, 2024
+
+SELECT DATE_FORMAT('1995-02-28', '%D of %M, %Y') as formatted_date;
+formatted_date
+28th of February, 1995
+
+SELECT ROUND(3.14159, 2);
+ROUND(3.14159, 2)
+3.14
+
+SELECT ROUND(6.789);
+ROUND(6.789)
+7
+
+SELECT ROUND(123.456, -1);
+ROUND(123.456, -1)
+120
+
+SELECT LENGTH('Hello');
+LENGTH('Hello')
+5
+
+SELECT LENGTH('This is a long sentence with spaces and punctuation!');
+LENGTH('This is a long sentence with spaces and punctuation!')
+52
+
+SELECT LENGTH('');
+LENGTH('')
+0
+
+SELECT DATE_FORMAT('2022-05', '%Y/%m/%d');
+NULL
+
+SELECT LENGTH(null);
+LENGTH(null)
+NULL
+
+4. query no const fields
+
+select some_field;
+FAILURE
+
+select 1 or some_field;
+FAILURE
+
+select *;
+FAILURE
+
+select 100 in (f1, f2, f3);
+FAILURE

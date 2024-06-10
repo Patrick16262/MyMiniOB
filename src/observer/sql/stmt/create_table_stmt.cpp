@@ -15,7 +15,6 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/create_table_stmt.h"
 #include "common/rc.h"
 #include "event/sql_debug.h"
-#include "sql/parser/parse_defs.h"
 #include "sql/parser/value.h"
 #include <vector>
 

@@ -22,6 +22,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/expression.h"
 
 #include "sql/expr/tuple_cell.h"
+#include "sql/parser/defs/expression_sql_defs.h"
 #include "sql/parser/defs/sql_query_nodes.h"
 #include "sql/stmt/stmt.h"
 #include "sql/stmt/table_ref_desc.h"
@@ -67,6 +68,15 @@ public:
   const std::unique_ptr<Expression>                 &filter() const { return filter_; }
 
 private:
+  RC resovle_attributes(const std::vector<ExpressionWithAliasSqlNode *> &attributes);
+  RC resolve_table(const std::vector<TableReferenceSqlNode *> &table_refs);
+
+private:
+  Db                              *db_ = nullptr;
+  std::vector<TableFactorDesc>     table_descs_;
+  std::vector<TupleCellSpec>       outter_tuple_schema_;  // 子查询用到的
+  std::vector<ExpressionSqlNode *> group_exprs_;          // 子查询用到的
+
   std::vector<std::unique_ptr<Expression>> project_expr_list_;  // 用于生成ProjectOperator
   std::vector<TupleCellSpec>               tuple_schema_;       // 显示的名字,
                                              // 由于投影的名称可能是别名，所以需要计算出应该显示的名字

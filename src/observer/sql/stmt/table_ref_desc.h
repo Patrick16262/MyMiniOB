@@ -17,14 +17,14 @@ class FieldDesc
 {
 
 public:
-  FieldDesc(std::string field_names, bool visible) : field_name_(std::move(field_names)), visible(visible) {}
+  FieldDesc(std::string field_names, bool visible) : field_name_(std::move(field_names)), visible_(visible) {}
   
   std::string field_name() const { return field_name_; }
-  bool        get_visible() const { return visible; }
+  bool        visible() const { return visible_; }
 
 private:
   std::string field_name_;
-  bool        visible;
+  bool        visible_;
 };
 
 /**

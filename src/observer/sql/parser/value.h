@@ -104,8 +104,7 @@ public:
 
 public:
   std::string to_complex_string() const;
-  void from_complex_string(const char *str);
-
+  void        from_complex_string(const char *str);
 
 private:
   AttrType attr_type_ = UNDEFINED;
@@ -120,36 +119,54 @@ private:
   std::string str_value_;
 };
 
-// 为了在unordered_map中使用Value
+// 不应该直接使用Value作为unordered_map的key，因为value存在隐式转换
+// template <>
+// struct std::hash<Value>
+// {
+//   size_t operator()(const Value &value) const
+//   {
+//     size_t hash = 0;
+//     switch (value.attr_type()) {
+//       case INTS: hash = std::hash<int>{}(value.get_int()); break;
+//       case FLOATS: hash = std::hash<float>{}(value.get_float()); break;
+//       case TEXTS:
+//       case CHARS: hash = std::hash<std::string>{}(value.get_string()); break;
+//       case BOOLEANS: hash = std::hash<bool>{}(value.get_boolean()); break;
+//       default: break;
+//     }
+//     return hash;
+//   }
+// };
+
+// 为了在map中使用Value
 template <>
-struct std::hash<Value>
+struct std::less<Value> : public std::binary_function<Value, Value, bool>
 {
-  size_t operator()(const Value &value) const
+  bool operator()(const Value &lhs, const Value &rhs) const
   {
-    size_t hash = 0;
-    switch (value.attr_type()) {
-      case INTS: hash = std::hash<int>{}(value.get_int()); break;
-      case FLOATS: hash = std::hash<float>{}(value.get_float()); break;
-      case TEXTS:
-      case CHARS: hash = std::hash<std::string>{}(value.get_string()); break;
-      case BOOLEANS: hash = std::hash<bool>{}(value.get_boolean()); break;
-      default: break;
+    try {
+      return lhs.compare(rhs) < 0;
+    } catch (bad_cast_exception &e) {
+      return false; // 出现null，认为两者相等
     }
-    return hash;
   }
 };
 
-// 为了在unordered_map中使用vector<Value>
+// 为了在map中使用vector<Value>
 template <>
-struct std::hash<std::vector<Value>>
+struct std::less<std::vector<Value>> : public std::binary_function<std::vector<Value>, std::vector<Value>, bool>
 {
-  size_t operator()(const std::vector<Value> &vec) const
+  bool operator()(const std::vector<Value> &lhs, const std::vector<Value> &rhs) const
   {
-    size_t hash = 0;
-    for (const auto &value : vec) {
-      hash ^= std::hash<Value>{}(value);
+    if (lhs.size() != rhs.size()) {
+      return lhs.size() < rhs.size();
     }
-    return hash;
+    for (size_t i = 0; i < lhs.size(); i++) {
+      if (lhs[i] != rhs[i]) {
+        return std::less<Value>()(lhs[i], rhs[i]);
+      }
+    }
+    return false;
   }
 };
 

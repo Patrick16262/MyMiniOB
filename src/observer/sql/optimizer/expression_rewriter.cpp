@@ -19,8 +19,8 @@ See the Mulan PSL v2 for more details. */
 
 ExpressionRewriter::ExpressionRewriter()
 {
-  expr_rewrite_rules_.emplace_back(new ComparisonSimplificationRule);
-  expr_rewrite_rules_.emplace_back(new ConjunctionSimplificationRule);
+  // expr_rewrite_rules_.emplace_back(new ComparisonSimplificationRule);
+  // expr_rewrite_rules_.emplace_back(new ConjunctionSimplificationRule);
 }
 
 RC ExpressionRewriter::rewrite(std::unique_ptr<LogicalOperator> &oper, bool &change_made)

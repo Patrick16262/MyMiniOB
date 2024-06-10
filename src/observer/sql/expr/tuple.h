@@ -225,6 +225,8 @@ public:
     project_exprs_.swap(project_exprs);
   }
 
+  void set_tuple_schema(std::vector<TupleCellSpec> tuple_schema) { tuple_schema_ = std::move(tuple_schema); }
+
   int cell_num() const override { return project_exprs_.size(); }
 
   RC cell_at(int index, Value &cell) const override
@@ -245,10 +247,19 @@ public:
     return rc;
   }
 
-  RC find_cell(const TupleCellSpec &spec, Value &cell) const override { return tuple_->find_cell(spec, cell); }
+  RC find_cell(const TupleCellSpec &spec, Value &cell) const override
+  {
+    for (size_t i = 0; i < tuple_schema_.size(); ++i) {
+      if (0 == strcmp(spec.alias(), tuple_schema_[i].alias())) {
+        return cell_at(i, cell);
+      }
+    }
+    return tuple_->find_cell(spec, cell);
+  }
 
 private:
   std::vector<std::unique_ptr<Expression>> project_exprs_;
+  std::vector<TupleCellSpec>               tuple_schema_;
   Tuple                                   *tuple_ = nullptr;
 };
 

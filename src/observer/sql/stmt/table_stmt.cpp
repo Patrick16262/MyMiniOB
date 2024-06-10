@@ -17,7 +17,7 @@
 
 using namespace std;
 
-RC TableStmtGenerator::create(Db *db, const std::vector<TableReferenceSqlNode *> table_sqls, TableStmt *&stmt)
+RC TableSqlResovler::create(Db *db, const std::vector<TableReferenceSqlNode *> table_sqls, TableStmt *&stmt)
 {
   assert(table_sqls.size() > 0);
   if (table_descs_.size() > 0) {
@@ -53,7 +53,7 @@ RC TableStmtGenerator::create(Db *db, const std::vector<TableReferenceSqlNode *>
   return RC::SUCCESS;
 }
 
-RC TableStmtGenerator::create(Db *db, const TableReferenceSqlNode *table_sql, TableStmt *&stmt)
+RC TableSqlResovler::create(Db *db, const TableReferenceSqlNode *table_sql, TableStmt *&stmt)
 {
   switch (table_sql->type) {
     case RelationType::TABLE: {
@@ -67,11 +67,12 @@ RC TableStmtGenerator::create(Db *db, const TableReferenceSqlNode *table_sql, Ta
     } break;
     default: {
       assert(false);
+      return RC::UNIMPLENMENT;
     } break;
   }
 }
 
-RC TableStmtGenerator::create(Db *db, const TablePrimarySqlNode *table_sql, TableStmt *&stmt)
+RC TableSqlResovler::create(Db *db, const TablePrimarySqlNode *table_sql, TableStmt *&stmt)
 {
   string         relation_name = table_sql->relation_name;
   Table         *table         = db->find_table(relation_name.c_str());
@@ -91,13 +92,13 @@ RC TableStmtGenerator::create(Db *db, const TablePrimarySqlNode *table_sql, Tabl
 
   // everything are ok
   stmt              = new TableStmt();
-  stmt->type_       = RelationType::TABLE;
+  stmt->rlation_type_       = RelationType::TABLE;
   stmt->table_      = table;
   stmt->alias_name_ = table_sql->alias;
   return RC::SUCCESS;
 }
 
-RC TableStmtGenerator::create(Db *db, const TableSubquerySqlNode *table_sql, TableStmt *&stmt)
+RC TableSqlResovler::create(Db *db, const TableSubquerySqlNode *table_sql, TableStmt *&stmt)
 {
   RC             rc;
   SelectStmt    *subquery   = nullptr;
@@ -126,14 +127,14 @@ RC TableStmtGenerator::create(Db *db, const TableSubquerySqlNode *table_sql, Tab
   table_descs_.emplace_back(table_name.c_str(), fields, RelationType::SELECT);
 
   stmt        = new TableStmt();
-  stmt->type_ = RelationType::SELECT;
+  stmt->rlation_type_ = RelationType::SELECT;
   stmt->subquery_.reset(subquery);
   stmt->alias_name_ = table_sql->alias;
 
   return RC::SUCCESS;
 }
 
-RC TableStmtGenerator::create(Db *db, const TableJoinSqlNode *table_sql, TableStmt *&stmt)
+RC TableSqlResovler::create(Db *db, const TableJoinSqlNode *table_sql, TableStmt *&stmt)
 {
   RC                              rc;
   TableStmt                      *left_table  = nullptr;
@@ -159,7 +160,7 @@ RC TableStmtGenerator::create(Db *db, const TableJoinSqlNode *table_sql, TableSt
   }
 
   stmt        = new TableStmt();
-  stmt->type_ = RelationType::JOIN;
+  stmt->rlation_type_ = RelationType::JOIN;
   stmt->left_table_.reset(left_table);
   stmt->right_table_.reset(right_table);
   stmt->join_condition_ = std::move(join_condition);

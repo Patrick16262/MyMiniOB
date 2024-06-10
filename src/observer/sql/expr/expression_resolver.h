@@ -18,6 +18,7 @@
 
 /**
  * @brief 表达式生成器，用于将sql语法树中的表达式节点转换为表达式对象
+ * 该对象可复用
  */
 
 class ExpressionGenerator
@@ -110,8 +111,8 @@ public:
 
 public:
   std::vector<std::unique_ptr<SubqueryExpressionSqlNode>> &subquery_sqls() { return refactor_.subqueries(); }
-  std::vector<SubqueryType>                   &subquery_types() { return refactor_.subquery_types(); }
-  std::vector<TupleCellSpec>                  &subquery_cell_desc() { return refactor_.subquery_cells(); }
+  std::vector<SubqueryType>                               &subquery_types() { return refactor_.subquery_types(); }
+  std::vector<TupleCellSpec>                              &subquery_cell_desc() { return refactor_.subquery_cells(); }
 
 private:
   ExpressionGenerator      generator_;
@@ -134,11 +135,11 @@ using GroupByExpressionResolver = WhereConditionExpressionResolver;
  * @note 该对象是有状态的一次性对象，不要重用
  */
 
-class QueryListGenerator
+class ProjectExpressionResovler
 {
 public:
-  QueryListGenerator() = default;
-  QueryListGenerator(Db *db, std::vector<TableFactorDesc> table_desc, std::vector<TupleCellSpec> outter_tuple,
+  ProjectExpressionResovler() = default;
+  ProjectExpressionResovler(Db *db, std::vector<TableFactorDesc> table_desc, std::vector<TupleCellSpec> outter_tuple,
       std::vector<ExpressionSqlNode *> group_exprs)
       : generator_(db, table_desc, outter_tuple),
         db_(db),
@@ -149,25 +150,29 @@ public:
   {
     assert(db_ != nullptr);
   }
-  virtual ~QueryListGenerator() = default;
+  virtual ~ProjectExpressionResovler() = default;
 
-  RC generate_query_list(const vector<ExpressionSqlNode *> &sql_nodes, vector<unique_ptr<Expression>> &query_exprs);
+  RC generate_query_list(
+    const vector<ExpressionWithAliasSqlNode *> &sql_nodes, vector<unique_ptr<Expression>> &query_exprs);
 
 public:
-  std::vector<SubqueryType>              &subquery_types() { return subquery_types_; }
+  std::vector<SubqueryType>                          &subquery_types() { return subquery_types_; }
   std::vector<unique_ptr<SubqueryExpressionSqlNode>> &subquerys() { return subquerys_; }
-  std::vector<TupleCellSpec>             &subquery_cell_desc() { return subquery_cell_desc_; }
-  std::vector<unique_ptr<AggregateDesc>> &aggregate_desc() { return aggregate_desc_; }
+  std::vector<TupleCellSpec>                         &subquery_cell_desc() { return subquery_cell_desc_; }
+  std::vector<unique_ptr<AggregateDesc>>             &aggregate_desc() { return aggregate_desc_; }
+  std::vector<TupleCellSpec>                         &attr_tuple() { return attr_tuple_; }
 
 private:
   RC wildcard_fields(FieldExpressionSqlNode *wildcard_expression, vector<unique_ptr<Expression>> &query_exprs);
 
 private:
-  std::vector<SubqueryType>              subquery_types_;
+  std::vector<SubqueryType>                          subquery_types_;
   std::vector<unique_ptr<SubqueryExpressionSqlNode>> subquerys_;
-  std::vector<TupleCellSpec>             subquery_cell_desc_;
+  std::vector<TupleCellSpec>                         subquery_cell_desc_;
 
   std::vector<unique_ptr<AggregateDesc>> aggregate_desc_;
+
+  std::vector<TupleCellSpec> attr_tuple_;
 
 private:
   ExpressionGenerator generator_;

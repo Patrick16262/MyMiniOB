@@ -15,7 +15,8 @@
         "kind": "build",
         "isDefault": true
       },
-      "dependsOn" : "gen_parser"
+      "dependsOn": "gen_parser",
+
     },
     {
       "label": "build_release",
@@ -25,12 +26,15 @@
         "kind": "build",
         "isDefault": true
       },
-      "dependsOn" : "gen_parser"
+      "dependsOn": "gen_parser"
     },
     {
       "label": "gen_parser",
       "type": "shell",
-      "command": "cd ${workspaceFolder}/src/observer/sql/parser && bash gen_parser.sh && cd ${workspaceFolder}"
+      "command": "cd ${workspaceFolder}/src/observer/sql/parser && bash gen_parser.sh && cd ${workspaceFolder}",
+      "presentation": {
+        "clear": true
+      }
     },
     {
       "type": "process",

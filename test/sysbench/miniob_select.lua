@@ -13,7 +13,7 @@
 require("miniob_common")
 
 sysbench.cmdline.commands.prepare = {
-    function ()
+    function()
         cmd_prepare()
     end,
     sysbench.cmdline.PARALLEL_COMMAND
@@ -31,5 +31,4 @@ function event()
     con:query(string.format(query, table_name, k_val))
 
     check_reconnect()
-
 end

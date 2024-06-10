@@ -3,6 +3,7 @@
 #include "sql/expr/expression.h"
 #include "sql/parser/defs/sql_node_fwd.h"
 #include "sql/parser/defs/sql_query_nodes.h"
+#include "sql/stmt/stmt.h"
 #include "storage/table/table.h"
 #include <memory>
 #include <vector>
@@ -16,14 +17,16 @@ class SelectStmt;
  *
  */
 
-class TableStmt
+class TableStmt : public Stmt
 {
 public:
   virtual ~TableStmt() = default;
 
-  friend class TableStmtGenerator;
+  friend class TableSqlResovler;
 
-  RelationType type() const { return type_; }
+  virtual StmtType type() const override { return StmtType::TABLE; };
+
+  RelationType relation_type() const { return relation_type_; }
   const char  *alias_name() const { return alias_name_.c_str(); }
 
   // table primary
@@ -41,7 +44,7 @@ private:
   TableStmt() = default;
 
 private:
-  RelationType type_;
+  RelationType relation_type_;
   std::string  alias_name_;
 
   // table primary
@@ -62,7 +65,7 @@ private:
  *
  */
 
-class TableStmtGenerator
+class TableSqlResovler
 {
 public:
   RC create(Db *db, const std::vector<TableReferenceSqlNode *> table_sqls, TableStmt *&stmt);

@@ -96,13 +96,11 @@ public:
   ~TableJoinSqlNode();
 };
 
-
-
 class InExpressionSqlNode : public ExpressionSqlNode
 {
 public:
   ExpressionSqlNode               *child    = nullptr;
-  SubqueryExpressionSqlNode       *subquery = nullptr;  // 如果是子查询，这个字段不为空，反正为空
+  ExpressionSqlNode               *subquery = nullptr;  // 如果是子查询，这个字段不为空，反正为空
   std::vector<ExpressionSqlNode *> value_list;
 
   bool operator==(const ExpressionSqlNode &other) const override;

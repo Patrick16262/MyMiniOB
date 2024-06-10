@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include <vector>
 
 #include "sql/expr/expression.h"
+#include "sql/expr/tuple_cell.h"
 #include "sql/operator/logical_operator.h"
 
 /**
@@ -28,14 +29,21 @@ See the Mulan PSL v2 for more details. */
 class ProjectLogicalOperator : public LogicalOperator
 {
 public:
-  ProjectLogicalOperator(std::vector<std::unique_ptr<Expression>> &expressions){
+  ProjectLogicalOperator(
+      std::vector<std::unique_ptr<Expression>> &expressions, std::vector<TupleCellSpec> tuple_schema_)
+      : tuple_schema_(std::move(tuple_schema_))
+  {
     expressions_.swap(expressions);
   }
   virtual ~ProjectLogicalOperator() = default;
 
   LogicalOperatorType type() const override { return LogicalOperatorType::PROJECTION; }
 
-//select中的列
+  // select中的列
   std::vector<std::unique_ptr<Expression>>       &expressions() { return expressions_; }
   const std::vector<std::unique_ptr<Expression>> &expressions() const { return expressions_; }
+  const std::vector<TupleCellSpec>               &tuple_schema() const { return tuple_schema_; }
+
+private:
+  std::vector<TupleCellSpec> tuple_schema_;
 };

@@ -26,8 +26,11 @@ See the Mulan PSL v2 for more details. */
 class ProjectPhysicalOperator : public PhysicalOperator
 {
 public:
-  ProjectPhysicalOperator(std::vector<std::unique_ptr<Expression>>& expressions) {
+  ProjectPhysicalOperator(
+      std::vector<std::unique_ptr<Expression>> &expressions, const std::vector<TupleCellSpec> &tuple_schema)
+  {
     tuple_.set_project_exprs(expressions);
+    tuple_.set_tuple_schema(tuple_schema);
   }
 
   virtual ~ProjectPhysicalOperator() = default;
@@ -44,4 +47,5 @@ public:
 
 private:
   ProjectTuple tuple_;
+  bool const_eof_ = false; //是否已经输出常量, 当不是常量时，此字段无效
 };
