@@ -35,7 +35,6 @@ See the Mulan PSL v2 for more details. */
 enum SqlCommandFlag
 {
   SCF_ERROR = 0,
-  SCF_CALC,
   SCF_SELECT,
   SCF_INSERT,
   SCF_UPDATE,
@@ -66,7 +65,6 @@ class ParsedSqlNode
 public:
   enum SqlCommandFlag flag;
   ErrorSqlNode        error;
-  CalcSqlNode         calc;
   SelectSqlNode       selection;
   InsertSqlNode       insertion;
   DeleteSqlNode       deletion;

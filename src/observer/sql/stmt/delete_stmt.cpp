@@ -13,46 +13,41 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/stmt/delete_stmt.h"
+#include "sql/expr/expression_resolver.h"
+#include "sql/stmt/table_ref_desc.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 #include <cassert>
+#include <memory>
+#include <utility>
 
-DeleteStmt::DeleteStmt(Table *table, FilterStmt *filter_stmt) : table_(table), filter_stmt_(filter_stmt) {}
-
-DeleteStmt::~DeleteStmt()
-{
-  // if (nullptr != filter_stmt_) {
-  //   delete filter_stmt_;
-  //   filter_stmt_ = nullptr;
-  // }
-}
+using namespace std;
 
 RC DeleteStmt::create(Db *db, const DeleteSqlNode &delete_sql, Stmt *&stmt)
 {
-  return RC::UNIMPLENMENT;
-  // RC          rc = RC::SUCCESS;
-  // DeleteStmt *delete_stmt = nullptr;
-  // FilterStmt *filter_stmt = nullptr;
+  RC                     rc          = RC::SUCCESS;
+  DeleteStmt            *delete_stmt = nullptr;
+  unique_ptr<Expression> filter_expr;
 
-  // // check whether the table exists
-  // Table *table = db->find_table(delete_sql.relation_name.c_str());
-  // if (nullptr == table) {
-  //   LOG_WARN("no such table. db=%s, table_name=%s", db->name(), delete_sql.relation_name.c_str());
-  //   return RC::SCHEMA_TABLE_NOT_EXIST;
-  // }
+  // check whether the table exists
+  Table *table = db->find_table(delete_sql.relation_name.c_str());
+  if (nullptr == table) {
+    LOG_WARN("no such table. db=%s, table_name=%s", db->name(), delete_sql.relation_name.c_str());
+    return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
 
-  // std::unordered_map<std::string, Table *> table_map;
-  // table_map.insert(std::pair<std::string, Table *>(delete_sql.relation_name, table));
+  TableFactorDesc table_desc = common::create_table_desc(table);
 
-  // if (delete_sql.condition) {
-  //   rc = FilterStmt::create(db, table, table_map, delete_sql.condition, filter_stmt);
-  //   if (rc != RC::SUCCESS) {
-  //     LOG_WARN("failed to create filter statement. rc=%d:%s", rc, strrc(rc));
-  //     return rc;
-  //   }
-  // }
+  if (delete_sql.condition) {
+    WhereConditionExpressionResolver resolver(db, {table_desc}, {});
+    rc = resolver.resolve(delete_sql.condition, filter_expr);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to create filter statement. rc=%d:%s", rc, strrc(rc));
+      return rc;
+    }
+  }
 
-  // delete_stmt = new DeleteStmt(table, filter_stmt);
-  // stmt = delete_stmt;
-  // return rc;
+  delete_stmt = new DeleteStmt(table, std::move(filter_expr));
+  stmt        = delete_stmt;
+  return rc;
 }

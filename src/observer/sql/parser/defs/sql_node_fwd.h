@@ -18,13 +18,14 @@ struct RelAttrSqlNode
 enum class RelationType
 {
   TABLE,
-  SELECT,
+  SUBQUERY,
   JOIN,
   VIEW,
 };
 
 /**
- * @brief Table引用，可以是一个表，也可以是一个查询，也可以是一个join 
+ * @brief Table引用，可以是一个表，也可以是一个查询，也可以是一个join
+*  其子类实现有TableReferenceSqlNode, TableSubquerySqlNode, TableJoinSqlNode 
  */
 class TableReferenceSqlNode
 {

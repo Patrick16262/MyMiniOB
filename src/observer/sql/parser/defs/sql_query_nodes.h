@@ -82,15 +82,15 @@ class TableSubquerySqlNode : public TableReferenceSqlNode
 public:
   SelectSqlNode subquery;
 
-  TableSubquerySqlNode() { TableReferenceSqlNode::type = RelationType::SELECT; }
+  TableSubquerySqlNode() { TableReferenceSqlNode::type = RelationType::SUBQUERY; }
 };
 
 class TableJoinSqlNode : public TableReferenceSqlNode
 {
 public:
-  TableReferenceSqlNode *left;
-  TableReferenceSqlNode *right;
-  ExpressionSqlNode     *condition;
+  TableReferenceSqlNode *left = nullptr;
+  TableReferenceSqlNode *right = nullptr;
+  ExpressionSqlNode     *condition = nullptr;
 
   TableJoinSqlNode() { TableReferenceSqlNode::type = RelationType::JOIN; }
   ~TableJoinSqlNode();

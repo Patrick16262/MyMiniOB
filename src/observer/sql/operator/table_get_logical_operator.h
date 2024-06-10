@@ -13,9 +13,11 @@ See the Mulan PSL v2 for more details. */
 //
 #pragma once
 
+#include "sql/expr/tuple_cell.h"
 #include "sql/operator/logical_operator.h"
 #include "storage/field/field.h"
 #include "common/types.h"
+#include <vector>
 
 /**
  * @brief 表示从表中获取数据的算子
@@ -30,15 +32,23 @@ public:
 
   LogicalOperatorType type() const override { return LogicalOperatorType::TABLE_GET; }
 
-  Table        *table() const { return table_; }
-  ReadWriteMode read_write_mode() const { return mode_; }
+  Table                     *table() const { return table_; }
+  ReadWriteMode              read_write_mode() const { return mode_; }
+  std::vector<TupleCellSpec> tuple_schema() const
+  {
+    std::vector<TupleCellSpec> tuple_schema;
+    for (const auto &field : fields_) {
+      tuple_schema.emplace_back(field.table_name(), field.field_name());
+    }
+    return tuple_schema;
+  }
 
   void set_predicates(std::vector<std::unique_ptr<Expression>> &&exprs);
   auto predicates() -> std::vector<std::unique_ptr<Expression>> & { return predicates_; }
 
 private:
   Table             *table_ = nullptr;
-  std::vector<Field> fields_; ///??这是干什么用的
+  std::vector<Field> fields_;
   ReadWriteMode      mode_ = ReadWriteMode::READ_WRITE;
 
   // 与当前表相关的过滤操作，可以尝试在遍历数据时执行

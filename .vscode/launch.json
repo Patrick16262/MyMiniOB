@@ -25,6 +25,38 @@
             "presentation": {
                 "clear": true
             }
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Server",
+            "program": "${workspaceFolder}/${defaultBuildTask}/bin/observer",
+            "args": [
+                "-f",
+                "${workspaceFolder}/etc/observer.ini",
+                "-t",
+                "mvcc",
+                "-d",
+                "disk"
+            ],
+            "cwd": "${workspaceFolder}/${defaultBuildTask}/",
+            "preLaunchTask": "${defaultBuildTask}",
+            "terminal": "integrated",
+            "presentation": {
+                "clear": true
+            }
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Client",
+            "program": "${workspaceFolder}/${defaultBuildTask}/bin/obclient",
+            "args": [],
+            "cwd": "${workspaceFolder}/${defaultBuildTask}/",
+            "terminal": "integrated",
+            "presentation": {
+                "clear": true
+            }
         }
     ]
 }

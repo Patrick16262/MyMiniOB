@@ -102,26 +102,27 @@ extern int yydebug;
     JOIN = 303,                    /* JOIN  */
     EXISTS = 304,                  /* EXISTS  */
     IN = 305,                      /* IN  */
-    NUMBER = 306,                  /* NUMBER  */
-    FLOAT = 307,                   /* FLOAT  */
-    ID = 308,                      /* ID  */
-    SSS = 309,                     /* SSS  */
-    IS = 310,                      /* IS  */
-    LIKE = 311,                    /* LIKE  */
-    OR = 312,                      /* OR  */
-    AND = 313,                     /* AND  */
-    NOT = 314,                     /* NOT  */
-    LT = 315,                      /* LT  */
-    GT = 316,                      /* GT  */
-    LE = 317,                      /* LE  */
-    GE = 318,                      /* GE  */
-    EQ = 319,                      /* EQ  */
-    NE = 320,                      /* NE  */
-    ADD = 321,                     /* ADD  */
-    SUB = 322,                     /* SUB  */
-    STAR = 323,                    /* STAR  */
-    DIV = 324,                     /* DIV  */
-    UMINUS = 325                   /* UMINUS  */
+    INNER = 306,                   /* INNER  */
+    NUMBER = 307,                  /* NUMBER  */
+    FLOAT = 308,                   /* FLOAT  */
+    ID = 309,                      /* ID  */
+    SSS = 310,                     /* SSS  */
+    IS = 311,                      /* IS  */
+    LIKE = 312,                    /* LIKE  */
+    OR = 313,                      /* OR  */
+    AND = 314,                     /* AND  */
+    NOT = 315,                     /* NOT  */
+    LT = 316,                      /* LT  */
+    GT = 317,                      /* GT  */
+    LE = 318,                      /* LE  */
+    GE = 319,                      /* GE  */
+    EQ = 320,                      /* EQ  */
+    NE = 321,                      /* NE  */
+    ADD = 322,                     /* ADD  */
+    SUB = 323,                     /* SUB  */
+    STAR = 324,                    /* STAR  */
+    DIV = 325,                     /* DIV  */
+    UMINUS = 326                   /* UMINUS  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -156,7 +157,7 @@ union YYSTYPE
   std::vector<ExpressionWithAliasSqlNode *> *     expression_with_alias_list;
   OrderType                                       order_type;
 
-#line 160 "yacc_sql.hpp"
+#line 161 "yacc_sql.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;

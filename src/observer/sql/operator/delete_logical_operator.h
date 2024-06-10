@@ -14,10 +14,13 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include "sql/expr/expression.h"
 #include "sql/operator/logical_operator.h"
+#include <memory>
+#include <utility>
 
 /**
- * delete operator下必须为可以产生rowTuple的operator 
+ * delete operator下必须为可以产生rowTuple的operator
  * @brief 逻辑算子，用于执行delete语句
  * @ingroup LogicalOperator
  */
@@ -30,6 +33,10 @@ public:
   LogicalOperatorType type() const override { return LogicalOperatorType::DELETE; }
   Table              *table() const { return table_; }
 
+  std::unique_ptr<Expression> &filter() { return filter_; }
+  void                         set_filter(std::unique_ptr<Expression> filter) { filter_ = std::move(filter); }
+
 private:
-  Table *table_ = nullptr;
+  Table                      *table_ = nullptr;
+  std::unique_ptr<Expression> filter_;
 };

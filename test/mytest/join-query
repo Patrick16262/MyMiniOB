@@ -1,0 +1,26 @@
+CREATE TABLE an_join_table(id int, name char);
+CREATE TABLE other_join_table(id int, num int);
+
+INSERT INTO an_join_table VALUES (1, 'a');
+INSERT INTO an_join_table VALUES (2, 'b');
+INSERT INTO an_join_table VALUES (3, 'c');
+INSERT INTO an_join_table VALUES (4, 'e');
+INSERT INTO an_join_table VALUES (5, 'f');
+INSERT INTO an_join_table VALUES (6, 'j');
+INSERT INTO an_join_table VALUES (7, 'h');
+INSERT INTO an_join_table VALUES (8, 'i');
+INSERT INTO an_join_table VALUES (9, 'g');
+INSERT INTO an_join_table VALUES (10, 'k');
+
+INSERT INTO other_join_table VALUES (10, 1);
+INSERT INTO other_join_table VALUES (11, 2);
+INSERT INTO other_join_table VALUES (12, 3);
+INSERT INTO other_join_table VALUES (13, 4);
+INSERT INTO other_join_table VALUES (14, 5);
+INSERT INTO other_join_table VALUES (15, 6);
+INSERT INTO other_join_table VALUES (16, 7);
+INSERT INTO other_join_table VALUES (17, 8);
+INSERT INTO other_join_table VALUES (18, 9);
+INSERT INTO other_join_table VALUES (19, 10);
+
+select * from an_join_table t1 join an_join_table t2 join an_join_table t3 join an_join_table t4 join other_join_table t5 on t1.id = t5.id;

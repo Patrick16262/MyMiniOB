@@ -102,16 +102,36 @@ RC ExpressionGenerator::generate_expression(const FieldExpressionSqlNode *sql_no
   }
 
   vector<TableFactorDesc> matched_tables;
-  bool                    match_alias = outter_alias_set_.find(rel_name) != outter_alias_set_.end();
+  bool                    match_outter_alias  = outter_alias_set_.find(rel_name) != outter_alias_set_.end();
+  bool                    match_current_alias = false;
+  TupleCellSpec           match_current_alias_spec("");
+
+  for (auto &cell : current_tuple_schema_) {
+    if (cell.alias() == attr_name) {
+      match_current_alias      = true;
+      match_current_alias_spec = cell;
+      break;
+    }
+  }
+
+  if (match_current_alias) {
+    match_outter_alias = false;
+    for (auto &schema : current_tuple_schema_) {
+      if (schema.alias() == attr_name) {
+        attr_name = schema.field_name();
+        break;
+      }
+    }
+  }
+
+  if (match_outter_alias) {
+    expr.reset(new TupleCellExpr(TupleCellSpec(attr_name.c_str())));
+    return RC::SUCCESS;
+  }
 
   auto p = field_table_map_.equal_range(attr_name);
   for (auto it = p.first; it != p.second; it++) {
     matched_tables.push_back(it->second);
-  }
-
-  if (match_alias) {
-    expr.reset(new TupleCellExpr(TupleCellSpec(attr_name.c_str())));
-    return RC::SUCCESS;
   }
 
   if (!db_) {
@@ -129,14 +149,19 @@ RC ExpressionGenerator::generate_expression(const FieldExpressionSqlNode *sql_no
   }
   if (rel_name.empty() && matched_tables.size() == 1) {
     string table_name = matched_tables[0].table_name();
-    Table *table      = db_->find_table(table_name.c_str());
+    Table *table      = matched_tables[0].table();
+    assert(table);
     expr.reset(new FieldExpr(table, table->table_meta().field(attr_name.c_str())));
     return RC::SUCCESS;
   }
   for (auto &table_desc : matched_tables) {
     if (table_desc.table_name() == rel_name) {
-      Table *table = db_->find_table(table_desc.table_name().c_str());
-      expr.reset(new FieldExpr(table, table->table_meta().field(attr_name.c_str())));
+      Table *table = table_desc.table();
+      if (table) {
+        expr.reset(new FieldExpr(table, table->table_meta().field(attr_name.c_str())));
+      } else {
+        expr.reset(new TupleCellExpr(TupleCellSpec(rel_name.c_str(), attr_name.c_str())));
+      }
       return RC::SUCCESS;
     }
   }
@@ -481,7 +506,7 @@ RC WhereConditionExpressionResolver::resolve(ExpressionSqlNode *sql_node, std::u
 /**
  * @brief 查询列表生成器
  */
-RC ProjectExpressionResovler::generate_query_list(
+RC ProjectExpressionResovler::generate_projection_list(
     const vector<ExpressionWithAliasSqlNode *> &sql_nodes, vector<unique_ptr<Expression>> &query_exprs)
 {
   vector<unique_ptr<Expression>> tmp_exprs;
@@ -527,13 +552,13 @@ RC ProjectExpressionResovler::generate_query_list(
       // 生成tuple_schema
       FieldExpressionSqlNode *field = dynamic_cast<FieldExpressionSqlNode *>(sql_node->expr);
       if (field) {
-        attr_tuple_.emplace_back(
+        resovled_attr_tuple_.emplace_back(
             field->field.relation_name.c_str(), field->field.attribute_name.c_str(), sql_node->alias.c_str());
       } else {
-        if (sql_node->alias.c_str()) {
-          attr_tuple_.emplace_back(sql_node->alias.c_str());
+        if (!sql_node->alias.empty()) {
+          resovled_attr_tuple_.emplace_back(sql_node->alias.c_str());
         } else {
-          attr_tuple_.emplace_back(sql_node->expr->name.c_str());
+          resovled_attr_tuple_.emplace_back(sql_node->expr->name.c_str());
         }
       }
     }
@@ -574,7 +599,7 @@ RC ProjectExpressionResovler::wildcard_fields(
         query_exprs.push_back(std::move(expr));
         delete temp_node;
 
-        attr_tuple_.emplace_back(table_desc.table_name().c_str(), field.field_name().c_str());
+        resovled_attr_tuple_.push_back(TupleCellSpec(table_desc.table_name().c_str(), field.field_name().c_str()));
       }
     }
   } else {

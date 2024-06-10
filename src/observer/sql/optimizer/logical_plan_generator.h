@@ -15,8 +15,10 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include <memory>
+#include <vector>
 
 #include "common/rc.h"
+#include "sql/expr/tuple_cell.h"
 #include "sql/stmt/table_stmt.h"
 
 class Stmt;
@@ -36,10 +38,13 @@ public:
   RC create(Stmt *stmt, std::unique_ptr<LogicalOperator> &logical_operator);
 
 private:
-  RC create_plan(CalcStmt *calc_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
   RC create_plan(TableStmt *table_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
   RC create_plan(SelectStmt *select_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
   RC create_plan(InsertStmt *insert_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
   RC create_plan(DeleteStmt *delete_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
   RC create_plan(ExplainStmt *explain_stmt, std::unique_ptr<LogicalOperator> &logical_operator);
+};
+
+namespace LogicalPlanUtils {
+  RC get_tuple_schema(const LogicalOperator *logical_operator, std::vector<TupleCellSpec> &tuple_schema);
 };

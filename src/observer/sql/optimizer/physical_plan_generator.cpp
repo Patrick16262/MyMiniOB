@@ -12,27 +12,35 @@ See the Mulan PSL v2 for more details. */
 // Created by Wangyunlai on 2022/12/14.
 //
 
+#include <algorithm>
+#include <cassert>
+#include <condition_variable>
+#include <memory>
 #include <utility>
+#include <vector>
 
 #include "common/log/log.h"
 #include "sql/expr/expression.h"
-#include "sql/operator/calc_logical_operator.h"
-#include "sql/operator/calc_physical_operator.h"
+#include "sql/expr/tuple_cell.h"
 #include "sql/operator/delete_logical_operator.h"
 #include "sql/operator/delete_physical_operator.h"
 #include "sql/operator/explain_logical_operator.h"
 #include "sql/operator/explain_physical_operator.h"
+#include "sql/operator/hash_join_physical_operator.h"
 #include "sql/operator/index_scan_physical_operator.h"
 #include "sql/operator/insert_logical_operator.h"
 #include "sql/operator/insert_physical_operator.h"
 #include "sql/operator/join_logical_operator.h"
 #include "sql/operator/join_physical_operator.h"
+#include "sql/operator/logical_operator.h"
+#include "sql/operator/physical_operator.h"
 #include "sql/operator/predicate_logical_operator.h"
 #include "sql/operator/predicate_physical_operator.h"
 #include "sql/operator/project_logical_operator.h"
 #include "sql/operator/project_physical_operator.h"
 #include "sql/operator/table_get_logical_operator.h"
 #include "sql/operator/table_scan_physical_operator.h"
+#include "sql/optimizer/logical_plan_generator.h"
 #include "sql/optimizer/physical_plan_generator.h"
 
 using namespace std;
@@ -42,9 +50,6 @@ RC PhysicalPlanGenerator::create(LogicalOperator &logical_operator, unique_ptr<P
   RC rc = RC::SUCCESS;
 
   switch (logical_operator.type()) {
-    case LogicalOperatorType::CALC: {
-      return create_plan(static_cast<CalcLogicalOperator &>(logical_operator), oper);
-    } break;
 
     case LogicalOperatorType::TABLE_GET: {
       return create_plan(static_cast<TableGetLogicalOperator &>(logical_operator), oper);
@@ -180,9 +185,15 @@ RC PhysicalPlanGenerator::create_plan(ProjectLogicalOperator &project_oper, uniq
   vector<unique_ptr<LogicalOperator>> &child_opers = project_oper.children();
 
   unique_ptr<PhysicalOperator> child_phy_oper;
+  unique_ptr<PhysicalOperator> filter_opr = nullptr; /*nullable*/
+
+  if (project_oper.filter()) {
+    filter_opr.reset(new PredicatePhysicalOperator(std::move(project_oper.filter())));
+  }
 
   RC rc = RC::SUCCESS;
   if (!child_opers.empty()) {
+    assert(child_opers.size() == 1);
     LogicalOperator *child_oper = child_opers.front().get();
     rc                          = create(*child_oper, child_phy_oper);
     if (rc != RC::SUCCESS) {
@@ -191,14 +202,19 @@ RC PhysicalPlanGenerator::create_plan(ProjectLogicalOperator &project_oper, uniq
     }
   }
 
-  ProjectPhysicalOperator *project_operator =
-      new ProjectPhysicalOperator(project_oper.expressions(), project_oper.tuple_schema());
+  unique_ptr<ProjectPhysicalOperator> project_operator(
+      new ProjectPhysicalOperator(project_oper.expressions(), project_oper.tuple_schema()));
 
   if (child_phy_oper) {
     project_operator->add_child(std::move(child_phy_oper));
   }
 
-  oper.reset(project_operator);
+  if (filter_opr) {
+    filter_opr->add_child(std::move(project_operator));
+    oper = std::move(filter_opr);
+  } else {
+    oper = std::move(project_operator);
+  }
 
   LOG_TRACE("create a project physical operator success.");
   return rc;
@@ -216,25 +232,32 @@ RC PhysicalPlanGenerator::create_plan(InsertLogicalOperator &insert_oper, unique
 RC PhysicalPlanGenerator::create_plan(DeleteLogicalOperator &delete_oper, unique_ptr<PhysicalOperator> &oper)
 {
   vector<unique_ptr<LogicalOperator>> &child_opers = delete_oper.children();
+  unique_ptr<PhysicalOperator>         child_physical_oper;
+  unique_ptr<PhysicalOperator>         perdict = nullptr; /*nulllable*/
+  RC                                   rc      = RC::SUCCESS;
+  assert(child_opers.size() == 1);
 
-  unique_ptr<PhysicalOperator> child_physical_oper;
+  LogicalOperator *child_oper = child_opers.front().get();
 
-  RC rc = RC::SUCCESS;
-  if (!child_opers.empty()) {
-    LogicalOperator *child_oper = child_opers.front().get();
+  rc = create(*child_oper, child_physical_oper);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to create physical operator. rc=%s", strrc(rc));
+    return rc;
+  }
 
-    rc = create(*child_oper, child_physical_oper);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to create physical operator. rc=%s", strrc(rc));
-      return rc;
-    }
+  if (delete_oper.filter()) {
+    perdict.reset(new PredicatePhysicalOperator(std::move(delete_oper.filter())));
   }
 
   oper = unique_ptr<PhysicalOperator>(new DeletePhysicalOperator(delete_oper.table()));
-
-  if (child_physical_oper) {
+  
+  if (perdict) {
+    perdict->add_child(std::move(oper));
+    oper = std::move(perdict);
+  } else {
     oper->add_child(std::move(child_physical_oper));
   }
+
   return rc;
 }
 
@@ -262,15 +285,13 @@ RC PhysicalPlanGenerator::create_plan(ExplainLogicalOperator &explain_oper, uniq
 
 RC PhysicalPlanGenerator::create_plan(JoinLogicalOperator &join_oper, unique_ptr<PhysicalOperator> &oper)
 {
-  RC rc = RC::SUCCESS;
-
+  RC                                   rc;
   vector<unique_ptr<LogicalOperator>> &child_opers = join_oper.children();
-  if (child_opers.size() != 2) {
-    LOG_WARN("join operator should have 2 children, but have %d", child_opers.size());
-    return RC::INTERNAL;
-  }
+  vector<unique_ptr<PhysicalOperator>> child_phyis_opers;
 
-  unique_ptr<PhysicalOperator> join_physical_oper(new NestedLoopJoinPhysicalOperator);
+  assert(join_oper.expressions().size() <= 1);
+  assert(child_opers.size() == 2);
+
   for (auto &child_oper : child_opers) {
     unique_ptr<PhysicalOperator> child_physical_oper;
     rc = create(*child_oper, child_physical_oper);
@@ -279,18 +300,54 @@ RC PhysicalPlanGenerator::create_plan(JoinLogicalOperator &join_oper, unique_ptr
       return rc;
     }
 
-    join_physical_oper->add_child(std::move(child_physical_oper));
+    child_phyis_opers.push_back(std::move(child_physical_oper));
   }
 
-  oper = std::move(join_physical_oper);
-  return rc;
-}
+  // 简单判断是否使用RbTreeJoin
+  if (!join_oper.expressions().empty() && join_oper.expressions().front()->type() == ExprType::COMPARISON) {
+    unique_ptr<Expression> &condition  = join_oper.expressions().front();
+    ComparisonExpr         *comp_expr  = static_cast<ComparisonExpr *>(condition.get());
+    unique_ptr<Expression> &left_expr  = comp_expr->left();
+    unique_ptr<Expression> &right_expr = comp_expr->right();
 
-RC PhysicalPlanGenerator::create_plan(CalcLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper)
-{
-  RC rc = RC::SUCCESS;
+    if (left_expr->type() == ExprType::FIELD && right_expr->type() == ExprType::FIELD &&
+        comp_expr->comp() == EQUAL_TO) {
+      LOG_TRACE("use RbTreeEqJoin");
+      vector<TupleCellSpec> tuple_schema;
+      RC                    rc = LogicalPlanUtils::get_tuple_schema(join_oper.children()[0].get(), tuple_schema);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to get tuple schema of RbTreeJoin. rc=%s", strrc(rc));
+        return rc;
+      }
 
-  CalcPhysicalOperator *calc_oper = new CalcPhysicalOperator(std::move(logical_oper.expressions()));
-  oper.reset(calc_oper);
+      oper.reset(
+          new RbTreeEqJoinPhysicalOperator(std::move(left_expr), std::move(right_expr), std::move(tuple_schema)));
+
+      for (auto &child_oper : child_phyis_opers) {
+        oper->add_child(std::move(child_oper));
+      }
+
+      condition = nullptr;
+      return RC::SUCCESS;
+    }
+  }
+
+  unique_ptr<PhysicalOperator> perdict = nullptr;
+
+  // 使用NestedLoopJoin
+  LOG_TRACE("use NestedLoopJoin join");
+  if (join_oper.expressions().empty()) {
+  } else {
+    perdict.reset(new PredicatePhysicalOperator(std::move(join_oper.expressions().front())));
+  }
+
+  oper.reset(new NestedLoopJoinPhysicalOperator());
+  oper->add_child(std::move(child_phyis_opers[0]));
+  oper->add_child(std::move(child_phyis_opers[1]));
+
+  if (perdict) {
+    perdict->add_child(std::move(oper));
+    oper = std::move(perdict);
+  }
   return rc;
 }

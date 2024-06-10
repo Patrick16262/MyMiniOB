@@ -97,9 +97,9 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
         HAVING
         AS
         JOIN
-        
         EXISTS
         IN
+        INNER
 
 
 
@@ -149,7 +149,6 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
 %type <expression>          expression
 %type <expression>          opt_join_condition
 %type <expression_list>     expression_list
-%type <sql_node>            calc_stmt
 %type <sql_node>            select_stmt
 %type <sql_node>            insert_stmt
 %type <sql_node>            update_stmt
@@ -207,8 +206,7 @@ commands: command_wrapper opt_semicolon  //commands or sqls. parser starts here.
   ;
 
 command_wrapper:
-    calc_stmt
-  | select_stmt
+   select_stmt
   | insert_stmt
   | update_stmt
   | delete_stmt
@@ -486,6 +484,14 @@ select_stmt:        /*  select 语句的语法解析树*/
         delete $7;
       }
     }
+    | CALC query_expression_list
+    {
+      $$ = new ParsedSqlNode(SCF_SELECT);
+      if ($2 != nullptr) {
+        $$->selection.attributes.swap(*$2);
+        delete $2;
+      }
+    }
     ;
 
 select_with_parenthesis : LBRACE select_stmt RBRACE
@@ -494,14 +500,7 @@ select_with_parenthesis : LBRACE select_stmt RBRACE
       $$->subquery = $2;
     }
 
-calc_stmt:
-    CALC expression_list
-    {
-      $$ = new ParsedSqlNode(SCF_CALC);
-      $$->calc.expressions.swap(*$2);
-      delete $2;
-    }
-    ;
+
 
 expression_list:
     expression
@@ -821,16 +820,16 @@ table_ref : table_factor opt_alias
         free($2);
       }
     }
-    | table_ref JOIN table_factor opt_alias opt_join_condition
+    | table_ref opt_inner JOIN table_factor opt_alias opt_join_condition
     {
       TableJoinSqlNode *tmp = new TableJoinSqlNode;
       tmp->left = $1;
-      tmp->right = $3;
-      if ($4) {
-        tmp->right->alias = $4;
-      }
+      tmp->right = $4;
       if ($5) {
-        tmp->condition = $5;
+        tmp->right->alias = $5;
+      }
+      if ($6) {
+        tmp->condition = $6;
       }
 
       $$ = tmp;
@@ -985,6 +984,10 @@ set_variable_stmt:
       free($2);
       delete $4;
     }
+    ;
+
+opt_inner : /*empty*/
+    | INNER
     ;
 
 opt_semicolon: /*empty*/

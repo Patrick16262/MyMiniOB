@@ -37,25 +37,37 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, const std::vector
     const std::vector<TableFactorDesc> outter_table, Stmt *&stmt)
 {
   RC          rc;
-  SelectStmt *select_stmt           = new SelectStmt;
-  select_stmt->group_exprs_         = select_sql.group_by;
-  select_stmt->db_                  = db;  
+  SelectStmt *select_stmt   = new SelectStmt;
+  select_stmt->group_exprs_ = select_sql.group_by;
+  select_stmt->db_          = db;
 
   if (!select_sql.group_by.empty()) {
     LOG_WARN("Group by is not supported yet");
     return RC::UNIMPLENMENT;
   }
 
-  rc = select_stmt->resolve_table(select_sql.relations);
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("Failed to resolve table, rc=%s", strrc(rc));
-    return rc;
+  if (!select_sql.relations.empty()) {
+    rc = select_stmt->resolve_table(select_sql.relations);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("Failed to resolve table, rc=%s", strrc(rc));
+      return rc;
+    }
   }
 
+  assert(!select_sql.attributes.empty());
   rc = select_stmt->resovle_attributes(select_sql.attributes);
   if (rc != RC::SUCCESS) {
     LOG_WARN("Failed to resolve attributes, rc=%s", strrc(rc));
     return rc;
+  }
+
+
+  if (select_sql.condition) {
+    rc = select_stmt->resolve_where(select_sql.condition); 
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("Failed to resolve where, rc=%s", strrc(rc));
+      return rc;
+    }
   }
 
   stmt = select_stmt;
@@ -67,14 +79,13 @@ RC SelectStmt::resovle_attributes(const std::vector<ExpressionWithAliasSqlNode *
 {
   ProjectExpressionResovler resolver(db_, table_descs_, outter_tuple_schema_, group_exprs_);
 
-
-  RC rc = resolver.generate_query_list(attributes, project_expr_list_);
+  RC rc = resolver.generate_projection_list(attributes, project_expr_list_);
   if (rc != RC::SUCCESS) {
     LOG_WARN("Failed to resolve expression, rc=%s", strrc(rc));
     return rc;
   }
 
-    // 生成tuple_schema
+  // 生成tuple_schema
   tuple_schema_ = std::move(resolver.attr_tuple());
 
   // aggregate_list_ = std::move(resolver.aggregate_desc());
@@ -83,20 +94,18 @@ RC SelectStmt::resovle_attributes(const std::vector<ExpressionWithAliasSqlNode *
     LOG_WARN("Subquery is not supported yet");
     return RC::UNIMPLENMENT;
   }
-  // // 生成子查询
-  // SubqueryStmtGenerator subquery_stmt_generator = SubqueryStmtGenerator(db_, table_descs_, tuple_schema_);
-  // for (int i = 0; i < resolver.subquerys().size(); i++) {
-  //   std::unique_ptr<SubqueryStmt> stmt;
-  //   rc = subquery_stmt_generator.create(&resolver.subquerys()[i]->subquery->selection,
-  //       resolver.subquery_types()[i],
-  //       resolver.subquery_cell_desc()[i],
-  //       stmt);
-  //   if (rc != RC::SUCCESS) {
-  //     LOG_WARN("Failed to create subquery stmt, rc=%s", strrc(rc));
-  //     return rc;
-  //   }
-  //   subquery_list_.push_back(std::move(stmt));
-  // }
+
+  return RC::SUCCESS;
+}
+
+RC SelectStmt::resolve_where( ExpressionSqlNode *where_expr) {
+  WhereConditionExpressionResolver resolver(db_, table_descs_, tuple_schema_);
+
+  RC rc= resolver.resolve(where_expr, filter_);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("Failed to resolve where expression, rc=%s", strrc(rc));
+    return rc;
+  }
 
   return RC::SUCCESS;
 }
@@ -104,7 +113,7 @@ RC SelectStmt::resovle_attributes(const std::vector<ExpressionWithAliasSqlNode *
 RC SelectStmt::resolve_table(const std::vector<TableReferenceSqlNode *> &table_refs)
 {
   TableSqlResovler table_stmt_generator;
-  TableStmt         *table_stmt;
+  TableStmt       *table_stmt;
 
   RC rc = table_stmt_generator.create(db_, table_refs, table_stmt);
   if (rc != RC::SUCCESS) {

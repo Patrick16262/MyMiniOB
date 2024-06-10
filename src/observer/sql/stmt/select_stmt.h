@@ -57,6 +57,7 @@ public:
   std::vector<std::unique_ptr<Expression>>    &group_by_list() { return group_by_list_; }
   std::vector<std::unique_ptr<ExprWithOrder>> &order_by_list() { return order_by_list_; }
   std::unique_ptr<Expression>                 &filter() { return filter_; }
+  std::vector<TableFactorDesc>                &table_descs() { return table_descs_; }
 
   const std::vector<std::unique_ptr<Expression>>    &project_expr_list() const { return project_expr_list_; }
   const std::vector<TupleCellSpec>                  &tuple_schema() const { return tuple_schema_; }
@@ -66,10 +67,18 @@ public:
   const std::vector<std::unique_ptr<Expression>>    &group_by_list() const { return group_by_list_; }
   const std::vector<std::unique_ptr<ExprWithOrder>> &order_by_list() const { return order_by_list_; }
   const std::unique_ptr<Expression>                 &filter() const { return filter_; }
+  const std::vector<TableFactorDesc>                &table_descs() const { return table_descs_; }
 
 private:
-  RC resovle_attributes(const std::vector<ExpressionWithAliasSqlNode *> &attributes);
+  /**
+   * SelectStmt的解析过程
+   * 解析表 -> 解析属性 -> 解析where表达式
+   * 
+   */
+
   RC resolve_table(const std::vector<TableReferenceSqlNode *> &table_refs);
+  RC resovle_attributes(const std::vector<ExpressionWithAliasSqlNode *> &attributes);
+  RC resolve_where( ExpressionSqlNode *where_expr);
 
 private:
   Db                              *db_ = nullptr;

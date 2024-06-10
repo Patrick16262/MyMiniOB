@@ -30,7 +30,6 @@ class Db;
  *
  */
 #define DEFINE_ENUM()            \
-  DEFINE_ENUM_ITEM(CALC)         \
   DEFINE_ENUM_ITEM(SELECT)       \
   DEFINE_ENUM_ITEM(TABLE)        \
   DEFINE_ENUM_ITEM(SUBQUERY)     \

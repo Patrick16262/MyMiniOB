@@ -59,7 +59,7 @@ RC TableSqlResovler::create(Db *db, const TableReferenceSqlNode *table_sql, Tabl
     case RelationType::TABLE: {
       return create(db, static_cast<const TablePrimarySqlNode *>(table_sql), stmt);
     } break;
-    case RelationType::SELECT: {
+    case RelationType::SUBQUERY: {
       return create(db, static_cast<const TableSubquerySqlNode *>(table_sql), stmt);
     } break;
     case RelationType::JOIN: {
@@ -74,9 +74,9 @@ RC TableSqlResovler::create(Db *db, const TableReferenceSqlNode *table_sql, Tabl
 
 RC TableSqlResovler::create(Db *db, const TablePrimarySqlNode *table_sql, TableStmt *&stmt)
 {
-  string         relation_name = table_sql->relation_name;
-  Table         *table         = db->find_table(relation_name.c_str());
-  string         table_name    = table_sql->alias.empty() ? relation_name : table_sql->alias;
+  string            relation_name = table_sql->relation_name;
+  Table            *table         = db->find_table(relation_name.c_str());
+  string            table_name    = table_sql->alias.empty() ? relation_name : table_sql->alias;
   vector<FieldDesc> fields;
 
   if (table == nullptr) {
@@ -88,22 +88,22 @@ RC TableSqlResovler::create(Db *db, const TablePrimarySqlNode *table_sql, TableS
     fields.emplace_back(meta.name(), meta.visible());
   }
 
-  table_descs_.emplace_back(table_name, fields, RelationType::TABLE);
+  table_descs_.emplace_back(table_name, fields, RelationType::TABLE, table);
 
   // everything are ok
-  stmt              = new TableStmt();
-  stmt->rlation_type_       = RelationType::TABLE;
-  stmt->table_      = table;
-  stmt->alias_name_ = table_sql->alias;
+  stmt                 = new TableStmt();
+  stmt->relation_type_ = RelationType::TABLE;
+  stmt->table_         = table;
+  stmt->alias_name_    = table_sql->alias;
   return RC::SUCCESS;
 }
 
 RC TableSqlResovler::create(Db *db, const TableSubquerySqlNode *table_sql, TableStmt *&stmt)
 {
-  RC             rc;
-  SelectStmt    *subquery   = nullptr;
-  Stmt         *&tmp        = *reinterpret_cast<Stmt **>(&subquery);
-  string         table_name = table_sql->alias;
+  RC                rc;
+  SelectStmt       *subquery   = nullptr;
+  Stmt            *&tmp        = *reinterpret_cast<Stmt **>(&subquery);
+  string            table_name = table_sql->alias;
   vector<FieldDesc> fields;
 
   if (table_name.empty()) {
@@ -118,16 +118,15 @@ RC TableSqlResovler::create(Db *db, const TableSubquerySqlNode *table_sql, Table
   }
 
   for (auto &attr : table_sql->subquery.attributes) {
-    fields.emplace_back(attr->alias.empty()
-                              ? attr->expr->name
-                              : static_cast<FieldExpressionSqlNode *>(attr->expr)->field.attribute_name,
-                              true);
+    fields.emplace_back(attr->alias.empty() ? attr->expr->name
+                                            : static_cast<FieldExpressionSqlNode *>(attr->expr)->field.attribute_name,
+        true);
   }
 
-  table_descs_.emplace_back(table_name.c_str(), fields, RelationType::SELECT);
+  table_descs_.emplace_back(table_name.c_str(), fields, RelationType::SUBQUERY);
 
-  stmt        = new TableStmt();
-  stmt->rlation_type_ = RelationType::SELECT;
+  stmt                 = new TableStmt();
+  stmt->relation_type_ = RelationType::SUBQUERY;
   stmt->subquery_.reset(subquery);
   stmt->alias_name_ = table_sql->alias;
 
@@ -136,11 +135,10 @@ RC TableSqlResovler::create(Db *db, const TableSubquerySqlNode *table_sql, Table
 
 RC TableSqlResovler::create(Db *db, const TableJoinSqlNode *table_sql, TableStmt *&stmt)
 {
-  RC                              rc;
-  TableStmt                      *left_table  = nullptr;
-  TableStmt                      *right_table = nullptr;
-  JoinConditionExpressionResolver resolver(db, table_descs_);
-  unique_ptr<Expression>          join_condition = nullptr;
+  RC                     rc;
+  TableStmt             *left_table     = nullptr;
+  TableStmt             *right_table    = nullptr;
+  unique_ptr<Expression> join_condition = nullptr;
 
   rc = create(db, table_sql->left, left_table);
   if (rc != RC::SUCCESS) {
@@ -153,14 +151,15 @@ RC TableSqlResovler::create(Db *db, const TableJoinSqlNode *table_sql, TableStmt
   }
 
   if (table_sql->condition) {
-    rc = resolver.resolve(table_sql->condition, join_condition);
+    JoinConditionExpressionResolver expr_resolver(db, table_descs_);
+    rc = expr_resolver.resolve(table_sql->condition, join_condition);
     if (rc != RC::SUCCESS) {
       return rc;
     }
   }
 
-  stmt        = new TableStmt();
-  stmt->rlation_type_ = RelationType::JOIN;
+  stmt                 = new TableStmt();
+  stmt->relation_type_ = RelationType::JOIN;
   stmt->left_table_.reset(left_table);
   stmt->right_table_.reset(right_table);
   stmt->join_condition_ = std::move(join_condition);

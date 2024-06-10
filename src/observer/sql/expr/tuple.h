@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include <cassert>
 #include <cfloat>
 #include <cstdio>
+#include <cstring>
 #include <json/value.h>
 #include <memory>
 #include <string>
@@ -250,6 +251,9 @@ public:
   RC find_cell(const TupleCellSpec &spec, Value &cell) const override
   {
     for (size_t i = 0; i < tuple_schema_.size(); ++i) {
+      if (strlen(spec.alias()) == 0) {
+        continue;
+      }
       if (0 == strcmp(spec.alias(), tuple_schema_[i].alias())) {
         return cell_at(i, cell);
       }
@@ -259,7 +263,7 @@ public:
 
 private:
   std::vector<std::unique_ptr<Expression>> project_exprs_;
-  std::vector<TupleCellSpec>               tuple_schema_;
+  std::vector<TupleCellSpec>               tuple_schema_; // 用于记录投影的alias
   Tuple                                   *tuple_ = nullptr;
 };
 
@@ -349,7 +353,7 @@ public:
   RC cell_at(int index, Value &value) const override
   {
     const int left_cell_num = left_->cell_num();
-    if (index > 0 && index < left_cell_num) {
+    if (index >= 0 && index < left_cell_num) {
       return left_->cell_at(index, value);
     }
 
@@ -661,7 +665,7 @@ private:
 class CacheTupleManager
 {
 public:
-  CacheTupleManager(std::vector<TupleCellSpec> &cell_specs) : cell_specs_(std::move(cell_specs)) {}
+  CacheTupleManager(std::vector<TupleCellSpec> cell_specs) : cell_specs_(std::move(cell_specs)) {}
   RC cloneTuple(const Tuple &tuple, std::unique_ptr<Tuple> &cache) const
   {
     if (tuple.cell_num() != cell_specs_.size()) {

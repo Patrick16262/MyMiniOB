@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "sql/expr/expression.h"
@@ -25,6 +26,10 @@ See the Mulan PSL v2 for more details. */
  * @brief project 表示投影运算
  * @ingroup LogicalOperator
  * @details 从表中获取数据后，可能需要过滤，投影，连接等等。
+ *
+ * @field expressions_ 表示select中的投影表达式
+ * @field tuple_schema_ 表示select中的列
+ * @field filter_ 表示select中的过滤条件
  */
 class ProjectLogicalOperator : public LogicalOperator
 {
@@ -44,6 +49,11 @@ public:
   const std::vector<std::unique_ptr<Expression>> &expressions() const { return expressions_; }
   const std::vector<TupleCellSpec>               &tuple_schema() const { return tuple_schema_; }
 
+  std::unique_ptr<Expression> &filter() { return filter_; }
+  void                         set_filter(std::unique_ptr<Expression> filter) { filter_ = std::move(filter); }
+
 private:
   std::vector<TupleCellSpec> tuple_schema_;
+
+  std::unique_ptr<Expression> filter_ = nullptr; /*nullable*/
 };

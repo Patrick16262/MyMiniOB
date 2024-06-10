@@ -8,7 +8,7 @@
 
 using namespace std;
 
-RC RbTreeJoinPhysicalOperator::open(Trx *trx)
+RC RbTreeEqJoinPhysicalOperator::open(Trx *trx)
 {
   assert(children_.size() == 2);
 
@@ -31,7 +31,7 @@ RC RbTreeJoinPhysicalOperator::open(Trx *trx)
   return RC::SUCCESS;
 }
 
-RC RbTreeJoinPhysicalOperator::next()
+RC RbTreeEqJoinPhysicalOperator::next()
 {
   RC rc;
 
@@ -54,13 +54,9 @@ RC RbTreeJoinPhysicalOperator::next()
   return RC::RECORD_EOF;
 }
 
-RC RbTreeJoinPhysicalOperator::close() {
+RC RbTreeEqJoinPhysicalOperator::close()
+{
   RC rc;
-
-  if ((rc = left_table_->close()) != RC::SUCCESS) {
-    LOG_WARN("close left table failed");
-    return rc;
-  }
 
   if ((rc = right_table_->close()) != RC::SUCCESS) {
     LOG_WARN("close right table failed");
@@ -71,11 +67,9 @@ RC RbTreeJoinPhysicalOperator::close() {
   return RC::SUCCESS;
 }
 
-Tuple *RbTreeJoinPhysicalOperator::current_tuple() {
-  return &current_tuple_;
-}
+Tuple *RbTreeEqJoinPhysicalOperator::current_tuple() { return &current_tuple_; }
 
-RC RbTreeJoinPhysicalOperator::generate_hash_table()
+RC RbTreeEqJoinPhysicalOperator::generate_hash_table()
 {
   Value             value;
   unique_ptr<Tuple> cache;
@@ -88,7 +82,11 @@ RC RbTreeJoinPhysicalOperator::generate_hash_table()
   }
 
   while ((rc = left_table_->next()) == RC::SUCCESS) {
-    cache_manager_.cloneTuple(*left_table_->current_tuple(), cache);
+    rc = cache_manager_.cloneTuple(*left_table_->current_tuple(), cache);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("clone tuple failed, due to %s", strrc(rc));
+      break;
+    }
 
     rc = left_expr_->get_value(*cache, value);
     if (rc != RC::SUCCESS) {
@@ -107,29 +105,41 @@ RC RbTreeJoinPhysicalOperator::generate_hash_table()
   return RC::SUCCESS;
 }
 
-RC RbTreeJoinPhysicalOperator::fetch_next_tuple_in_table()
+RC RbTreeEqJoinPhysicalOperator::fetch_next_tuple_in_table()
 {
-  RC rc;
-  if ((rc = right_table_->next()) != RC::SUCCESS) {
-    return rc;
-  }
-
+  RC    rc;
   Value value;
-  rc = right_expr_->get_value(*right_table_->current_tuple(), value);
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("get value failed");
-    return rc;
-  }
 
-  eq_range_it_ = left_hash_table_.equal_range(value);
+  while (true) {
+    if ((rc = right_table_->next()) != RC::SUCCESS) {
+      return rc;
+    }
+
+    rc = right_expr_->get_value(*right_table_->current_tuple(), value);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("get value failed");
+      return rc;
+    }
+
+    eq_range_it_ = left_hash_table_.equal_range(value);
+    if (eq_range_it_.first != eq_range_it_.second) {
+      break;
+    }
+  }
+  
   current_tuple_.set_left(eq_range_it_.first->second.get());
   current_tuple_.set_right(right_table_->current_tuple());
 
   return RC::SUCCESS;
 }
 
-RC RbTreeJoinPhysicalOperator::fetch_next_tuple_in_range()
+RC RbTreeEqJoinPhysicalOperator::fetch_next_tuple_in_range()
 {
+  // 有可能eq_range_it_已经到达end
+  if (eq_range_it_.first == eq_range_it_.second) {
+    return RC::RECORD_EOF;
+  }
+
   eq_range_it_.first++;
 
   if (eq_range_it_.first == eq_range_it_.second) {

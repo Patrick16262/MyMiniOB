@@ -95,7 +95,7 @@ void Value::set_data(char *data, int length)
       length_               = length;
     } break;
     case TEXTS: {
-      ASSERT(false, "TODO not implemented");
+      assert(false); //"TODO not implemented"
     }
     case NULLS: {
       assert(false);

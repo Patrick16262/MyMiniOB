@@ -14,7 +14,9 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include "sql/expr/expression.h"
 #include "sql/stmt/stmt.h"
+#include <memory>
 
 class Table;
 class FilterStmt;
@@ -26,18 +28,19 @@ class FilterStmt;
 class DeleteStmt : public Stmt
 {
 public:
-  DeleteStmt(Table *table, FilterStmt *filter_stmt);
-  ~DeleteStmt() override;
+  DeleteStmt(Table *table, std::unique_ptr<Expression> filter_expr) : table_(table), filter_(std::move(filter_expr)) {}
+  ~DeleteStmt() = default;
 
-  Table      *table() const { return table_; }
-  FilterStmt *filter_stmt() const { return filter_stmt_; }
+  Table *table() const { return table_; }
 
   StmtType type() const override { return StmtType::DELETE; }
 
 public:
   static RC create(Db *db, const DeleteSqlNode &delete_sql, Stmt *&stmt);
 
+  std::unique_ptr<Expression> &filter()  { return filter_; }
+
 private:
-  Table      *table_       = nullptr;
-  FilterStmt *filter_stmt_ = nullptr;
+  Table                      *table_ = nullptr;
+  std::unique_ptr<Expression> filter_;
 };

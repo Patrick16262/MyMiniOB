@@ -13,7 +13,6 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/operator/table_scan_physical_operator.h"
-#include "common/types.h"
 #include "event/sql_debug.h"
 #include "storage/table/table.h"
 #include "storage/trx/trx.h"

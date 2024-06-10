@@ -32,7 +32,6 @@ See the Mulan PSL v2 for more details. */
  */
 enum class LogicalOperatorType
 {
-  CALC,
   TABLE_GET,   ///< 从表中获取数据
   PREDICATE,   ///< 过滤，就是谓词
   PROJECTION,  ///< 投影，就是select
@@ -57,6 +56,7 @@ public:
 
   void                                           add_child(std::unique_ptr<LogicalOperator> oper);
   std::vector<std::unique_ptr<LogicalOperator>> &children() { return children_; }
+  const std::vector<std::unique_ptr<LogicalOperator>> &children() const { return children_; }
   std::vector<std::unique_ptr<Expression>>      &expressions() { return expressions_; }
 
 protected:

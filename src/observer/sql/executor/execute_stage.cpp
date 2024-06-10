@@ -22,7 +22,6 @@ See the Mulan PSL v2 for more details. */
 #include "event/session_event.h"
 #include "event/sql_event.h"
 #include "sql/executor/command_executor.h"
-#include "sql/stmt/calc_stmt.h"
 #include "sql/stmt/select_stmt.h"
 #include "sql/stmt/stmt.h"
 
@@ -68,15 +67,15 @@ RC ExecuteStage::handle_request_with_physical_operator(SQLStageEvent *sql_event)
     case StmtType::SELECT: {
       SelectStmt *select_stmt = static_cast<SelectStmt *>(stmt);
       for (const auto &tuple_cell : select_stmt->tuple_schema()) {
-        schema.append_cell(tuple_cell);
-      }
-    } break;
 
-    case StmtType::CALC: {
-      CalcStmt *calc_stmt = static_cast<CalcStmt *>(stmt);
-
-      for (const std::string &name : calc_stmt->tuple_schema()) {
-        schema.append_cell(name.c_str());
+        if (strlen(tuple_cell.alias()) != 0) {
+          schema.append_cell(tuple_cell.alias());
+        } else if (select_stmt->table_descs().size() <= 1) {
+          schema.append_cell(tuple_cell.field_name());
+        } else {
+          string str = std::string(tuple_cell.table_name()) + "." + tuple_cell.field_name();
+          schema.append_cell(str.c_str());
+        }
       }
     } break;
 

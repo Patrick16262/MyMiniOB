@@ -1,7 +1,7 @@
 ADD_EXECUTABLE(obclient)
 MESSAGE("Begin to build " obclient)
 
-INCLUDE(readline)
+INCLUDE(readline) 
 MINIOB_FIND_READLINE()
 
 IF (HAVE_READLINE)

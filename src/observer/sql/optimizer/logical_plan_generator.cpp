@@ -17,10 +17,10 @@ See the Mulan PSL v2 for more details. */
 #include <cassert>
 #include <common/log/log.h>
 #include <memory>
-#include <type_traits>
 #include <utility>
+#include <vector>
 
-#include "sql/operator/calc_logical_operator.h"
+#include "sql/expr/expression.h"
 #include "sql/operator/delete_logical_operator.h"
 #include "sql/operator/explain_logical_operator.h"
 #include "sql/operator/insert_logical_operator.h"
@@ -30,14 +30,12 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/project_logical_operator.h"
 #include "sql/operator/table_get_logical_operator.h"
 
-#include "sql/stmt/calc_stmt.h"
 #include "sql/stmt/delete_stmt.h"
 #include "sql/stmt/explain_stmt.h"
 #include "sql/stmt/insert_stmt.h"
 #include "sql/stmt/select_stmt.h"
 #include "sql/stmt/stmt.h"
 #include "storage/field/field.h"
-#include "storage/field/field_meta.h"
 #include "storage/table/table.h"
 
 using namespace std;
@@ -46,11 +44,6 @@ RC LogicalPlanGenerator::create(Stmt *stmt, unique_ptr<LogicalOperator> &logical
 {
   RC rc = RC::SUCCESS;
   switch (stmt->type()) {
-    case StmtType::CALC: {
-      CalcStmt *calc_stmt = static_cast<CalcStmt *>(stmt);
-
-      rc = create_plan(calc_stmt, logical_operator);
-    } break;
 
     case StmtType::SELECT: {
       SelectStmt *select_stmt = static_cast<SelectStmt *>(stmt);
@@ -81,84 +74,129 @@ RC LogicalPlanGenerator::create(Stmt *stmt, unique_ptr<LogicalOperator> &logical
       rc = create_plan(table_stmt, logical_operator);
     } break;
     default: {
-      LOG_WARN("unsupported stmt type: %d", stmt->type());
-      assert(false);
+      LOG_INFO("current stmt does not need to generate logical plan, stmt type: %d", static_cast<int>(stmt->type()));
+
       rc = RC::UNIMPLENMENT;
     }
   }
   return rc;
 }
 
-RC LogicalPlanGenerator::create_plan(CalcStmt *calc_stmt, std::unique_ptr<LogicalOperator> &logical_operator)
-{
-  return RC::UNIMPLENMENT;
-  // logical_operator.reset(new CalcLogicalOperator(std::move(calc_stmt->expressions())));
-  // return RC::SUCCESS;
-}
-
-RC LogicalPlanGenerator::create_plan(TableStmt *table_stmt, std::unique_ptr<LogicalOperator> &logical_operator)
+RC LogicalPlanGenerator::create_plan(TableStmt *table_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
   switch (table_stmt->relation_type()) {
-    case RelationType::TABLE:
-    case RelationType::SELECT:
-    case RelationType::JOIN:
-    case RelationType::VIEW: 
+    case RelationType::TABLE: {
+      Table        *table = table_stmt->table();
+      vector<Field> fields;
+      assert(table != nullptr);
+
+      for (auto &field : *table->table_meta().field_metas()) {
+        fields.emplace_back(table, &field);
+      }
+
+      TableGetLogicalOperator *table_get_oper = new TableGetLogicalOperator(table, fields, ReadWriteMode::READ_ONLY);
+      logical_operator.reset(table_get_oper);
+
+      return RC::SUCCESS;
+    } break;
+    case RelationType::SUBQUERY: {
+      LOG_WARN("subquery has not been supported yet");
+      return RC::UNIMPLENMENT;
+    } break;
+    case RelationType::JOIN: {
+      JoinLogicalOperator        *join_oper = new JoinLogicalOperator;
+      unique_ptr<LogicalOperator> left      = nullptr;
+      unique_ptr<LogicalOperator> right     = nullptr;
+
+      RC rc = create(table_stmt->left_table().get(), left);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to create left table operator. rc=%s", strrc(rc));
+        return rc;
+      }
+
+      rc = create(table_stmt->right_table().get(), right);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to create right table operator. rc=%s", strrc(rc));
+        return rc;
+      }
+
+      join_oper->add_child(std::move(left));
+      join_oper->add_child(std::move(right));
+
+      if (table_stmt->join_condition()) {
+        join_oper->set_condition(std::move(table_stmt->join_condition()));
+      }
+
+      logical_operator.reset(join_oper);
+
+      return RC::SUCCESS;
+    } break;
+    case RelationType::VIEW: {
+      LOG_WARN("view has not been supported yet");
+      return RC::UNIMPLENMENT;
+    } break;
     default: {
       LOG_WARN("unsupported relation type: %d", table_stmt->relation_type());
       assert(false);
       return RC::UNIMPLENMENT;
-    }
+    } break;
   }
 }
 
 RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
-  logical_operator.reset(new ProjectLogicalOperator(select_stmt->project_expr_list(), select_stmt->tuple_schema()));
+  ProjectLogicalOperator *project =
+      new ProjectLogicalOperator(select_stmt->project_expr_list(), select_stmt->tuple_schema());
 
+  if (select_stmt->table_stmt()) {
+    unique_ptr<LogicalOperator> table_oper;
+    RC                          rc = create(select_stmt->table_stmt().get(), table_oper);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to create table operator. rc=%s", strrc(rc));
+      return rc;
+    }
+
+    project->add_child(std::move(table_oper));
+  }
+
+  if (select_stmt->filter()) {
+    project->set_filter(std::move(select_stmt->filter()));
+  }
+
+  logical_operator.reset(project);
   return RC::SUCCESS;
 }
 
 RC LogicalPlanGenerator::create_plan(InsertStmt *insert_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
-  return RC::UNIMPLENMENT;
-  //   Table        *table = insert_stmt->table();
-  //   vector<Value> values(insert_stmt->values(), insert_stmt->values() + insert_stmt->value_amount());
+  Table        *table = insert_stmt->table();
+  vector<Value> values(insert_stmt->values(), insert_stmt->values() + insert_stmt->value_amount());
 
-  //   InsertLogicalOperator *insert_operator = new InsertLogicalOperator(table, values);
-  //   logical_operator.reset(insert_operator);
-  //   return RC::SUCCESS;
+  InsertLogicalOperator *insert_operator = new InsertLogicalOperator(table, values);
+  logical_operator.reset(insert_operator);
+  return RC::SUCCESS;
 }
 
 RC LogicalPlanGenerator::create_plan(DeleteStmt *delete_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
-  return RC::UNIMPLENMENT;
-  //   Table             *table       = delete_stmt->table();
-  //   FilterStmt        *filter_stmt = delete_stmt->filter_stmt();
-  //   std::vector<Field> fields;
-  //   for (int i = table->table_meta().sys_field_num(); i < table->table_meta().field_num(); i++) {
-  //     const FieldMeta *field_meta = table->table_meta().field(i);
-  //     fields.push_back(Field(table, field_meta));
-  //   }
-  //   unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, fields,
-  //   ReadWriteMode::READ_WRITE));
+  Table                 *table   = delete_stmt->table();
+  unique_ptr<Expression> perdict = std::move(delete_stmt->filter());
+  std::vector<Field>     fields;
 
-  //   unique_ptr<LogicalOperator> predicate_oper;
-  //   RC                          rc = create_plan(filter_stmt, predicate_oper);
-  //   if (rc != RC::SUCCESS) {
-  //     return rc;
-  //   }
+  for (int i = table->table_meta().sys_field_num(); i < table->table_meta().field_num(); i++) {
+    const FieldMeta *field_meta = table->table_meta().field(i);
+    fields.push_back(Field(table, field_meta));
+  }
+  unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, fields, ReadWriteMode::READ_WRITE));
 
-  //   unique_ptr<LogicalOperator> delete_oper(new DeleteLogicalOperator(table));
+  DeleteLogicalOperator *delete_oper = new DeleteLogicalOperator(table);
+  delete_oper->set_filter(std::move(perdict));
 
-  //   if (predicate_oper) {
-  //     predicate_oper->add_child(std::move(table_get_oper));
-  //     delete_oper->add_child(std::move(predicate_oper));
-  //   } else {
-  //     delete_oper->add_child(std::move(table_get_oper));
-  //   }
+  delete_oper->add_child(std::move(table_get_oper));
 
-  //   logical_operator = std::move(delete_oper);
-  //   return rc;
+  logical_operator.reset(delete_oper);
+
+  return RC::SUCCESS;
 }
 
 RC LogicalPlanGenerator::create_plan(ExplainStmt *explain_stmt, unique_ptr<LogicalOperator> &logical_operator)
@@ -176,4 +214,53 @@ RC LogicalPlanGenerator::create_plan(ExplainStmt *explain_stmt, unique_ptr<Logic
   logical_operator = unique_ptr<LogicalOperator>(new ExplainLogicalOperator);
   logical_operator->add_child(std::move(child_oper));
   return rc;
+}
+
+RC LogicalPlanUtils::get_tuple_schema(const LogicalOperator *logical_operator, std::vector<TupleCellSpec> &tuple_schema)
+{
+  switch (logical_operator->type()) {
+    case LogicalOperatorType::TABLE_GET: {
+      const TableGetLogicalOperator *table_get_oper = static_cast<const TableGetLogicalOperator *>(logical_operator);
+      tuple_schema                                  = table_get_oper->tuple_schema();
+    } break;
+    case LogicalOperatorType::PREDICATE: {
+      const PredicateLogicalOperator *predicate_oper = static_cast<const PredicateLogicalOperator *>(logical_operator);
+      RC                              rc = get_tuple_schema(predicate_oper->children().front().get(), tuple_schema);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
+    } break;
+    case LogicalOperatorType::PROJECTION: {
+      const ProjectLogicalOperator *project_oper = static_cast<const ProjectLogicalOperator *>(logical_operator);
+      tuple_schema                               = project_oper->tuple_schema();
+    } break;
+    case LogicalOperatorType::JOIN: {
+      const JoinLogicalOperator *join_oper = static_cast<const JoinLogicalOperator *>(logical_operator);
+      vector<TupleCellSpec>      left_tuple_schema;
+      vector<TupleCellSpec>      right_tuple_schema;
+      RC                         rc;
+
+      rc = get_tuple_schema(join_oper->children().front().get(), left_tuple_schema);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to get left tuple schema. rc=%s", strrc(rc));
+        return rc;
+      }
+
+      rc = get_tuple_schema(join_oper->children().back().get(), right_tuple_schema);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to get right tuple schema. rc=%s", strrc(rc));
+        return rc;
+      }
+
+      tuple_schema.clear();
+      tuple_schema.insert(tuple_schema.end(), left_tuple_schema.begin(), left_tuple_schema.end());
+      tuple_schema.insert(tuple_schema.end(), right_tuple_schema.begin(), right_tuple_schema.end());
+    } break;
+
+    default: {
+      LOG_WARN("current logical operator cannot get schema , operator type: %d", static_cast<int>(logical_operator->type()));
+      return RC::UNIMPLENMENT;
+    }
+  }
+  return RC::SUCCESS;
 }
