@@ -65,12 +65,14 @@ ELSE()
     MESSAGE(STATUS "This is UNKNOW OS")
 ENDIF(WIN32)
 
-# This is for clangd plugin for vscode
-SET(CMAKE_COMMON_FLAGS "${CMAKE_COMMON_FLAGS} -Wall") # dont Werror=all
-add_compile_options(-Werror=unused-variable)
-add_compile_options(-Werror=uninitialized)
-add_compile_options(-Werror=return-type)
-add_compile_options(-Werror=dangling-gsl)
+IF(DEBUG)
+    # This is for clangd plugin for vscode
+    SET(CMAKE_COMMON_FLAGS "${CMAKE_COMMON_FLAGS} -Wall") # dont Werror=all
+    add_compile_options(-Werror=unused-variable)
+    add_compile_options(-Werror=uninitialized)
+    add_compile_options(-Werror=return-type)
+    add_compile_options(-Werror=dangling-gsl)
+endif(DEBUG)
 
 # add_compile_options()
 IF(ENABLE_NOPIE)
@@ -148,6 +150,7 @@ IF(DEBUG)
         MESSAGE(STATUS "Instrumenting with Undefined Behavior Sanitizer")
         SET(UBSAN_FLAGS "${UBSAN_FLAGS} -fno-omit-frame-pointer")
         SET(UBSAN_FLAGS "${UBSAN_FLAGS} -fsanitize=undefined")
+
         # SET(UBSAN_FLAGS "${UBSAN_FLAGS} -fsanitize=implicit-conversion")
         # SET(UBSAN_FLAGS "${UBSAN_FLAGS} -fsanitize=implicit-integer-truncation")
         # SET(UBSAN_FLAGS "${UBSAN_FLAGS} -fsanitize=integer")
