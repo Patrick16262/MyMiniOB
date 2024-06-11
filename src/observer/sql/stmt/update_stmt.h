@@ -15,9 +15,11 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include "common/rc.h"
+#include "sql/expr/expression.h"
 #include "sql/stmt/stmt.h"
-
-class Table;
+#include "storage/field/field.h"
+#include <memory>
+#include <vector>
 
 /**
  * @brief 更新语句
@@ -27,18 +29,22 @@ class UpdateStmt : public Stmt
 {
 public:
   UpdateStmt() = default;
-  UpdateStmt(Table *table, Value *values, int value_amount);
+
+  StmtType type() const override { return StmtType::UPDATE; };
 
 public:
   static RC create(Db *db, const UpdateSqlNode &update_sql, Stmt *&stmt);
 
 public:
-  Table *table() const { return table_; }
-  Value *values() const { return values_; }
-  int    value_amount() const { return value_amount_; }
+  Table                    *table() const { return table_; }
+  const std::vector<Field> &fields() const { return fields_; }
+  const std::vector<Value> &values() const { return values_; }
+
+  std::unique_ptr<Expression> &filter()  { return filter_; }
 
 private:
-  Table *table_        = nullptr;
-  Value *values_       = nullptr;
-  int    value_amount_ = 0;
+  Table                      *table_;
+  std::vector<Field>          fields_;
+  std::vector<Value>          values_;
+  std::unique_ptr<Expression> filter_ = nullptr;
 };

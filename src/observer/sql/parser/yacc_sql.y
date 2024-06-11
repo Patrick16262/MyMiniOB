@@ -127,6 +127,8 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
   std::vector<ExpressionWithOrderSqlNode *> *     order_by_list;
   ExpressionWithAliasSqlNode *                    expression_with_alias;
   std::vector<ExpressionWithAliasSqlNode *> *     expression_with_alias_list;
+  UpdateAssignmentSqlNode *                       update_asgn_factor;
+  std::vector<UpdateAssignmentSqlNode *> *        update_asgn_list;
   OrderType                                       order_type;
 }
 
@@ -186,6 +188,8 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
 %type <order_type>          opt_order_type
 %type <expression_with_alias> query_expression
 %type <expression_with_alias_list> query_expression_list
+%type <update_asgn_factor>  update_asgn_factor
+%type <update_asgn_list>    update_asgn_list
 
 %left IS
 %nonassoc LIKE
@@ -442,20 +446,45 @@ delete_stmt:    /*  delete 语句的语法解析树*/
     ;
     
 update_stmt:      /*  update 语句的语法解析树*/
-    UPDATE ID SET ID EQ value opt_where 
+    UPDATE ID SET update_asgn_list opt_where 
     {
       $$ = new ParsedSqlNode(SCF_UPDATE);
       $$->update.relation_name = $2;
-      $$->update.attribute_name = $4;
-      $$->update.value = *$6;
-      if ($7 != nullptr) {
-        $$->update.condition = $7;
-        delete $7;
+      $$->update.assignments.swap(*$4);
+      if ($5 != nullptr) {
+        $$->update.condition = $5;
       }
       free($2);
-      free($4);
     }
     ;
+
+update_asgn_factor :
+     ID EQ expression
+    {
+      UpdateAssignmentSqlNode *tmp = new UpdateAssignmentSqlNode;
+      tmp->attribute_name = $1;
+      tmp->value = $3;
+
+      $$ = tmp;
+    }
+
+update_asgn_list :
+    update_asgn_factor
+    {
+      $$ = new std::vector<UpdateAssignmentSqlNode *>;
+      $$->push_back($1);
+    }
+    | update_asgn_factor COMMA update_asgn_list
+    {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new std::vector<UpdateAssignmentSqlNode *>;
+      }
+      $$->insert($$->begin(), $1);
+    }
+    ;
+
 
 select_stmt:        /*  select 语句的语法解析树*/
     SELECT query_expression_list opt_table_refs opt_where opt_group_by opt_having opt_order_by 

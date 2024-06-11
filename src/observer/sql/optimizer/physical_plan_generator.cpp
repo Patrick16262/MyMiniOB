@@ -40,6 +40,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/project_physical_operator.h"
 #include "sql/operator/table_get_logical_operator.h"
 #include "sql/operator/table_scan_physical_operator.h"
+#include "sql/operator/update_physical_operator.h"
 #include "sql/optimizer/logical_plan_generator.h"
 #include "sql/optimizer/physical_plan_generator.h"
 
@@ -69,6 +70,10 @@ RC PhysicalPlanGenerator::create(LogicalOperator &logical_operator, unique_ptr<P
 
     case LogicalOperatorType::DELETE: {
       return create_plan(static_cast<DeleteLogicalOperator &>(logical_operator), oper);
+    } break;
+
+    case LogicalOperatorType::UPDATE: {
+      return create_plan(static_cast<UpdateLogicalOperator &>(logical_operator), oper);
     } break;
 
     case LogicalOperatorType::EXPLAIN: {
@@ -350,4 +355,25 @@ RC PhysicalPlanGenerator::create_plan(JoinLogicalOperator &join_oper, unique_ptr
     oper = std::move(perdict);
   }
   return rc;
+}
+
+RC PhysicalPlanGenerator::create_plan(UpdateLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper)
+{
+  assert(!logical_oper.children().empty());
+
+  unique_ptr<PhysicalOperator>       child_phyis_oper;
+  unique_ptr<UpdatePhysicalOperator> update_phyis_opr(
+      new UpdatePhysicalOperator(logical_oper.table(), logical_oper.fields()));
+  update_phyis_opr->set_new_values(logical_oper.new_values());
+
+  RC rc = create(*logical_oper.children().front(), child_phyis_oper);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to create child physical operator of update operator. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  update_phyis_opr->add_child(std::move(child_phyis_oper));
+
+  oper = std::move(update_phyis_opr);
+  return RC::SUCCESS;
 }

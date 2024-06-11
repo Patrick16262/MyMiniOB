@@ -105,7 +105,7 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
   table_meta_.serialize(fs);
   fs.close();
 
-  db_ = db;
+  db_       = db;
   base_dir_ = base_dir;
 
   std::string        data_file = table_data_file(base_dir, name);
@@ -127,7 +127,8 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
   return rc;
 }
 
-RC Table::drop() {
+RC Table::drop()
+{
   // 删除表文件
   std::string data_file = table_data_file(base_dir_.c_str(), name());
   if (remove(data_file.c_str()) != 0) {
@@ -171,7 +172,7 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
   }
   fs.close();
 
-  db_ = db;
+  db_       = db;
   base_dir_ = base_dir;
 
   // 加载数据文件
@@ -282,6 +283,13 @@ const char *Table::name() const { return table_meta_.name(); }
 
 const TableMeta &Table::table_meta() const { return table_meta_; }
 
+/**
+ * @brief make_record 生成一条记录
+ * @note values中的数据类型必须与表的字段类型绝对一致，因此在Insert和Update时，需要先对数据类型进行检查和转换
+ *       生成的record中不会对系统字段进行初始化
+ * @return RC
+ */
+
 RC Table::make_record(int value_num, const Value *values, Record &record)
 {
   // 检查字段类型是否一致
@@ -327,7 +335,7 @@ RC Table::init_record_handler(const char *base_dir)
   std::string data_file = table_data_file(base_dir, table_meta_.name());
 
   BufferPoolManager &bpm = db_->buffer_pool_manager();
-  RC rc = bpm.open_file(db_->log_handler(), data_file.c_str(), data_buffer_pool_);
+  RC                 rc  = bpm.open_file(db_->log_handler(), data_file.c_str(), data_buffer_pool_);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to open disk buffer pool for file:%s. rc=%d:%s", data_file.c_str(), rc, strrc(rc));
     return rc;
@@ -457,7 +465,7 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
 
 RC Table::delete_record(const RID &rid)
 {
-  RC rc = RC::SUCCESS;
+  RC     rc = RC::SUCCESS;
   Record record;
   rc = get_record(rid, record);
   if (OB_FAIL(rc)) {

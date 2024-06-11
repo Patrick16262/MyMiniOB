@@ -45,7 +45,7 @@ RC PredicateRewriteRule::rewrite(std::unique_ptr<LogicalOperator> &oper, bool &c
   bool bool_value;
   try {
     bool_value = value_expr->get_value().get_boolean();
-  } catch (bad_cast_exception) {
+  } catch (null_cast_exception) {
     //null
     bool_value = false;
   }

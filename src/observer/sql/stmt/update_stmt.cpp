@@ -13,14 +13,75 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/stmt/update_stmt.h"
+#include "common/log/log.h"
+#include "common/rc.h"
+#include "sql/expr/expression.h"
+#include "sql/expr/expression_resolver.h"
+#include "sql/stmt/table_ref_desc.h"
+#include "storage/field/field_meta.h"
+#include "storage/table/table.h"
+#include "storage/db/db.h"
+#include <cassert>
+#include <memory>
+#include <utility>
+#include <vector>
 
-UpdateStmt::UpdateStmt(Table *table, Value *values, int value_amount)
-    : table_(table), values_(values), value_amount_(value_amount)
-{}
+using namespace std;
 
 RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
 {
-  // TODO
-  stmt = nullptr;
-    return RC::UNIMPLENMENT;
+  unique_ptr<UpdateStmt> update_stmt(new UpdateStmt());
+  unique_ptr<Expression> filter;
+  Table                 *table = db->find_table(update.relation_name.c_str());
+  vector<Value>          values;
+  vector<Field>          fields;
+  RC                     rc;
+
+  if (table == nullptr) {
+    return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
+
+  if (update.condition) {
+    WhereConditionExpressionResolver resolver(db, {TableFactorDesc(table)}, {});
+    RC                               rc = resolver.resolve(update.condition, filter);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("Failed to resolve where condition, rc = %s", strrc(rc));
+      return rc;
+    }
+  }
+
+  for (auto assignment : update.assignments) {
+    const FieldMeta *field_meta = table->table_meta().field(assignment->attribute_name.c_str());
+    if (field_meta == nullptr) {
+      return RC::SCHEMA_FIELD_NOT_EXIST;
+    }
+
+    Value                   value;
+    unique_ptr<Expression>  value_expr;
+    ConstExpressionResovler resolver;
+    Field                   asgin_field(table, field_meta);
+
+    fields.push_back(asgin_field);
+
+    rc = resolver.resolve(assignment->value, value_expr);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("No const expression in update assignment has not been supported yet, rc = %s", strrc(rc));
+      return rc;
+    }
+
+    rc = value_expr->try_get_value(value);
+    if (rc != RC::SUCCESS) {
+      assert(false);
+    }
+
+    values.push_back(value);
+  }
+
+  update_stmt->table_  = table;
+  update_stmt->fields_ = fields;
+  update_stmt->values_ = values;
+  update_stmt->filter_ = std::move(filter);
+
+  stmt = update_stmt.release();
+  return RC::SUCCESS;
 }

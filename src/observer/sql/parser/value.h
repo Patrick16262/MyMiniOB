@@ -43,7 +43,7 @@ enum AttrType
 const char *attr_type_to_string(AttrType type);
 AttrType    attr_type_from_string(const char *s);
 
-class bad_cast_exception
+class null_cast_exception
 {};
 
 /**
@@ -146,7 +146,7 @@ struct std::less<Value> : public std::binary_function<Value, Value, bool>
   {
     try {
       return lhs.compare(rhs) < 0;
-    } catch (bad_cast_exception &e) {
+    } catch (null_cast_exception &e) {
       return false; // 出现null，认为两者相等
     }
   }

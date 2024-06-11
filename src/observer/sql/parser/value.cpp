@@ -67,7 +67,7 @@ bool Value::operator==(const Value &other) const
   }
   try {
     return compare(other) == 0;
-  } catch (bad_cast_exception) {
+  } catch (null_cast_exception) {
     return false;
   }
 }
@@ -95,7 +95,7 @@ void Value::set_data(char *data, int length)
       length_               = length;
     } break;
     case TEXTS: {
-      assert(false); //"TODO not implemented"
+      assert(false);  //"TODO not implemented"
     }
     case NULLS: {
       assert(false);
@@ -358,7 +358,7 @@ int Value::get_int() const
       return num_value_.int_value_;
     }
     case NULLS: {
-      throw bad_cast_exception();
+      throw null_cast_exception();
     }
     case UNDEFINED: {
       assert(false);
@@ -393,7 +393,7 @@ float Value::get_float() const
       return float(num_value_.int_value_);
     }
     case NULLS: {
-      throw bad_cast_exception();
+      throw null_cast_exception();
     }
     case UNDEFINED: {
       assert(false);
@@ -405,7 +405,7 @@ float Value::get_float() const
 std::string Value::get_string() const
 {
   if (attr_type_ == NULLS) {
-    throw bad_cast_exception();
+    throw null_cast_exception();
   }
   return this->to_string();
 }
@@ -447,7 +447,7 @@ bool Value::get_boolean() const
       return num_value_.int_value_ != 0;
     }
     case NULLS: {
-      throw bad_cast_exception();
+      throw null_cast_exception();
     }
     case UNDEFINED: {
       assert(false);
@@ -482,11 +482,11 @@ double Value::get_double() const
       return double(num_value_.int_value_);
     }
     case NULLS: {
-      throw bad_cast_exception();
+      throw null_cast_exception();
     }
     default: {
       assert(false);
-      throw bad_cast_exception();
+      throw null_cast_exception();
     }
   }
   return 0;
@@ -530,8 +530,8 @@ namespace common {
  * @param value 需要转换的值
  * @param type 期望转换的类型, 不应为Undefined
  * @param res 转换后的值
- * @return RC::SUCCESS 转换成功
- *         RC::NULL_VALUE 如果value为NULL
+ * @return RC::SUCCESS               转换成功
+ *         RC::INCORRECT_DATE_FORMAT 如果date有误
  */
 RC try_convert_value(const Value &value, AttrType type, Value &res)
 {
@@ -557,7 +557,7 @@ RC try_convert_value(const Value &value, AttrType type, Value &res)
         std::string str = value.get_string();
         res.set_date(str.c_str());
         if (res.attr_type() == NULLS) {
-          throw bad_cast_exception();
+          return RC::INCORRECT_DATE_FORMAT;
         }
       } break;
       case TEXTS: {
@@ -566,12 +566,10 @@ RC try_convert_value(const Value &value, AttrType type, Value &res)
       } break;
       case NULLS: {
         res.set_null();
-        return RC::NULL_VALUE;
       } break;
     }
-  } catch (bad_cast_exception) {
+  } catch (null_cast_exception) {
     res.set_null();
-    return RC::NULL_VALUE;
   }
   return RC::SUCCESS;
 }

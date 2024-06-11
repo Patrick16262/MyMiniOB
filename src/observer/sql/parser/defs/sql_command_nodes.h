@@ -36,16 +36,29 @@ struct DeleteSqlNode
   ExpressionSqlNode *condition = nullptr;
 };
 
+struct UpdateAssignmentSqlNode
+{
+  std::string        attribute_name;
+  ExpressionSqlNode *value;
+};
+
 /**
  * @brief 描述一个update语句
  * @ingroup SQLParser
  */
 struct UpdateSqlNode
 {
-  std::string       relation_name;   ///< Relation to update
-  std::string       attribute_name;  ///< 更新的字段，仅支持一个字段
-  Value             value;           ///< 更新的值，仅支持一个字段
-  ExpressionSqlNode *condition = nullptr;
+  std::string                            relation_name;  ///< Relation to update
+  std::vector<UpdateAssignmentSqlNode *> assignments;    ///< 要更新的字段
+  ExpressionSqlNode                     *condition = nullptr;
+
+  ~UpdateSqlNode()
+  {
+    for (auto assignment : assignments) {
+      delete assignment;
+      assignments.clear();
+    }
+  }
 };
 
 /**

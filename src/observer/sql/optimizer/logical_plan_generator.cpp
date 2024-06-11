@@ -30,11 +30,13 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/project_logical_operator.h"
 #include "sql/operator/table_get_logical_operator.h"
 
+#include "sql/operator/update_logical_operator.h"
 #include "sql/stmt/delete_stmt.h"
 #include "sql/stmt/explain_stmt.h"
 #include "sql/stmt/insert_stmt.h"
 #include "sql/stmt/select_stmt.h"
 #include "sql/stmt/stmt.h"
+#include "sql/stmt/update_stmt.h"
 #include "storage/field/field.h"
 #include "storage/table/table.h"
 
@@ -61,6 +63,12 @@ RC LogicalPlanGenerator::create(Stmt *stmt, unique_ptr<LogicalOperator> &logical
       DeleteStmt *delete_stmt = static_cast<DeleteStmt *>(stmt);
 
       rc = create_plan(delete_stmt, logical_operator);
+    } break;
+
+    case StmtType::UPDATE : {
+      UpdateStmt *update_stmt = static_cast<UpdateStmt *>(stmt);
+
+      rc = create_plan(update_stmt, logical_operator);
     } break;
 
     case StmtType::EXPLAIN: {
@@ -195,6 +203,40 @@ RC LogicalPlanGenerator::create_plan(DeleteStmt *delete_stmt, unique_ptr<Logical
   delete_oper->add_child(std::move(table_get_oper));
 
   logical_operator.reset(delete_oper);
+
+  return RC::SUCCESS;
+}
+
+RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, std::unique_ptr<LogicalOperator> &logical_operator)
+{
+  unique_ptr<UpdateLogicalOperator> update_logical_operator(
+      new UpdateLogicalOperator(update_stmt->table(), update_stmt->fields()));
+  unique_ptr<PredicateLogicalOperator> perdict = nullptr;
+
+  vector<Field> fields;
+  Table        *table = update_stmt->table();
+
+  for (int i = table->table_meta().sys_field_num(); i < table->table_meta().field_num(); i++) {
+    const FieldMeta *field_meta = table->table_meta().field(i);
+    fields.push_back(Field(table, field_meta));
+  }
+
+  unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, fields, ReadWriteMode::READ_WRITE));
+
+  if (update_stmt->filter()) {
+    perdict.reset(new PredicateLogicalOperator(std::move(update_stmt->filter())));
+  }
+
+  if (perdict) {
+    perdict->add_child(std::move(table_get_oper));
+    update_logical_operator->add_child(std::move(perdict));
+  } else {
+    update_logical_operator->add_child(std::move(table_get_oper));
+  }
+
+  update_logical_operator->set_values(update_stmt->values());
+
+  logical_operator = std::move(update_logical_operator);
 
   return RC::SUCCESS;
 }

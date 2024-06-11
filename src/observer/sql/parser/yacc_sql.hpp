@@ -155,9 +155,11 @@ union YYSTYPE
   std::vector<ExpressionWithOrderSqlNode *> *     order_by_list;
   ExpressionWithAliasSqlNode *                    expression_with_alias;
   std::vector<ExpressionWithAliasSqlNode *> *     expression_with_alias_list;
+  UpdateAssignmentSqlNode *                       update_asgn_factor;
+  std::vector<UpdateAssignmentSqlNode *> *        update_asgn_list;
   OrderType                                       order_type;
 
-#line 161 "yacc_sql.hpp"
+#line 163 "yacc_sql.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;

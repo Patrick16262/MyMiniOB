@@ -51,7 +51,7 @@ RC PredicatePhysicalOperator::next()
       if (value.get_boolean()) {
         return rc;
       }
-    } catch (bad_cast_exception) {
+    } catch (null_cast_exception) {
       //do nothing, null as false
     }
   }

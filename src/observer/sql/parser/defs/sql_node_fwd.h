@@ -25,7 +25,7 @@ enum class RelationType
 
 /**
  * @brief Table引用，可以是一个表，也可以是一个查询，也可以是一个join
-*  其子类实现有TableReferenceSqlNode, TableSubquerySqlNode, TableJoinSqlNode 
+ *  其子类实现有TableReferenceSqlNode, TableSubquerySqlNode, TableJoinSqlNode
  */
 class TableReferenceSqlNode
 {
@@ -33,7 +33,6 @@ public:
   RelationType type;
   std::string  alias;
 };
-
 
 /**
  * @brief 描述一个属性
@@ -46,3 +45,4 @@ struct AttrInfoSqlNode
   std::string name;    ///< Attribute name
   size_t      length;  ///< Length of attribute
 };
+

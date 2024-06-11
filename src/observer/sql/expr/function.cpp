@@ -46,7 +46,7 @@ RC LengthFunction::function_body(std::vector<Value> params, Value &result) const
 {
   try {
     params[0].get_string();
-  } catch (bad_cast_exception) {
+  } catch (null_cast_exception) {
     result.set_null();
     return RC::SUCCESS;
   }
@@ -70,7 +70,7 @@ RC RoundFunction::function_body(std::vector<Value> params, Value &result) const
     float num;
     try {
       num = params[0].get_float();
-    } catch (bad_cast_exception) {
+    } catch (null_cast_exception) {
       result.set_null();
       return RC::SUCCESS;
     }
@@ -84,7 +84,7 @@ RC RoundFunction::function_body(std::vector<Value> params, Value &result) const
     try {
       num       = params[0].get_float();
       precision = params[1].get_int();
-    } catch (bad_cast_exception) {
+    } catch (null_cast_exception) {
       result.set_null();
       return RC::SUCCESS;
     }
@@ -131,7 +131,7 @@ RC DateFormatFunction::function_body(std::vector<Value> params, Value &result) c
     year    = ymd / 10000;
     month   = (ymd % 10000) / 100;
     day     = ymd % 100;
-  } catch (bad_cast_exception) {
+  } catch (null_cast_exception) {
     result.set_null();
     return RC::SUCCESS;
   }

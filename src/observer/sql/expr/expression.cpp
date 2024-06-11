@@ -80,10 +80,10 @@ RC CastExpr::cast(const Value &value, Value &cast_value) const
         cast_value.set_text(val.c_str());
       } break;
       default: {
-        throw bad_cast_exception();
+        throw null_cast_exception();
       }
     }
-  } catch (bad_cast_exception) {
+  } catch (null_cast_exception) {
     rc = RC::SUCCESS;
     cast_value.set_null();
   }
@@ -125,7 +125,7 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
   int cmp_result;
   try {
     cmp_result = left.compare(right);
-  } catch (bad_cast_exception) {
+  } catch (null_cast_exception) {
     return RC::NULL_VALUE;
   }
 
@@ -410,7 +410,7 @@ RC ArithmeticExpr::get_value(const Tuple &tuple, Value &value) const
   }
   try {
     rc = calc_value(left_value, right_value, value);
-  } catch (bad_cast_exception) {
+  } catch (null_cast_exception) {
     value.set_null();
     rc = RC::SUCCESS;
   }
@@ -440,7 +440,7 @@ RC ArithmeticExpr::try_get_value(Value &value) const
 
   try {
     rc = calc_value(left_value, right_value, value);
-  } catch (bad_cast_exception) {
+  } catch (null_cast_exception) {
     value.set_null();
     rc = RC::SUCCESS;
   }
@@ -481,7 +481,7 @@ RC LikeExpr::get_value(const Tuple &tuple, Value &value) const
 
   try {
     child_str = child_value.get_string();
-  } catch (bad_cast_exception) {
+  } catch (null_cast_exception) {
     value.set_null();
     return RC::SUCCESS;
   }
@@ -511,7 +511,7 @@ RC LikeExpr::try_get_value(Value &value) const
 
   try {
     child_str = child_value.get_string();
-  } catch (bad_cast_exception) {
+  } catch (null_cast_exception) {
     value.set_null();
     return RC::SUCCESS;
   }
@@ -546,7 +546,7 @@ RC NotExpr::get_value(const Tuple &tuple, Value &value) const
   try {
     bool bool_value = child_value.get_boolean();
     value.set_boolean(!bool_value);
-  } catch (bad_cast_exception) {
+  } catch (null_cast_exception) {
     value.set_null();
     return RC::SUCCESS;
   }
@@ -568,7 +568,7 @@ RC NotExpr::try_get_value(Value &value) const
   try {
     bool bool_value = child_value.get_boolean();
     value.set_boolean(!bool_value);
-  } catch (bad_cast_exception) {
+  } catch (null_cast_exception) {
     value.set_null();
     return RC::SUCCESS;
   }
