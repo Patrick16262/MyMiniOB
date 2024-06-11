@@ -55,5 +55,5 @@ public:
 private:
   std::vector<TupleCellSpec> tuple_schema_;
 
-  std::unique_ptr<Expression> filter_ = nullptr; /*nullable*/
+  std::unique_ptr<Expression> filter_ = nullptr; /*nullable*/ 
 };

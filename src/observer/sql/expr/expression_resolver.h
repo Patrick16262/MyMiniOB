@@ -165,7 +165,7 @@ public:
   std::vector<unique_ptr<SubqueryExpressionSqlNode>> &subquerys() { return subquerys_; }
   std::vector<TupleCellSpec>                         &subquery_cell_desc() { return subquery_cell_desc_; }
   std::vector<unique_ptr<AggregateDesc>>             &aggregate_desc() { return aggregate_desc_; }
-  std::vector<TupleCellSpec>                         &attr_tuple() { return resovled_attr_tuple_; }
+  std::vector<TupleCellSpec>                         &attr_tuple() { return resovled_attr_tuple_specs_; }
 
 private:
   RC wildcard_fields(FieldExpressionSqlNode *wildcard_expression, vector<unique_ptr<Expression>> &query_exprs);
@@ -177,7 +177,7 @@ private:
 
   std::vector<unique_ptr<AggregateDesc>> aggregate_desc_;
 
-  std::vector<TupleCellSpec> resovled_attr_tuple_;
+  std::vector<TupleCellSpec> resovled_attr_tuple_specs_;
 
 private:
   ExpressionGenerator generator_;

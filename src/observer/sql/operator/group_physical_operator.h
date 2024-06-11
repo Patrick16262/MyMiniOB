@@ -3,15 +3,16 @@
 #include "sql/expr/expression.h"
 #include "sql/expr/tuple.h"
 #include "sql/operator/physical_operator.h"
-#include <utility>
+#include "sql/stmt/table_ref_desc.h"
+#include <memory>
 #include <vector>
 
 class GroupPhysicalOperator : public PhysicalOperator
 {
 public:
-  GroupPhysicalOperator(AggregateTupleManager tuple_factory) : tuple_factory_(std::move(tuple_factory)) {
-    group_exprs = tuple_factory_.group_exprs();
-  }
+  GroupPhysicalOperator(std::vector<std::unique_ptr<AggregateDesc>> descs) : tuple_factory_(std::move(descs))
+  {}
+
   PhysicalOperatorType type() const override { return PhysicalOperatorType::GROUP; };
 
   RC open(Trx *trx) override;

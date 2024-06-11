@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/rc.h"
 #include "sql/expr/expression.h"
 #include "sql/expr/expression_resolver.h"
+#include "sql/parser/value.h"
 #include "sql/stmt/table_ref_desc.h"
 #include "storage/field/field_meta.h"
 #include "storage/table/table.h"
@@ -56,7 +57,8 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
       return RC::SCHEMA_FIELD_NOT_EXIST;
     }
 
-    Value                   value;
+    Value                   inplace_value;
+    Value                   converted_value;
     unique_ptr<Expression>  value_expr;
     ConstExpressionResovler resolver;
     Field                   asgin_field(table, field_meta);
@@ -69,12 +71,17 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
       return rc;
     }
 
-    rc = value_expr->try_get_value(value);
+    rc = value_expr->try_get_value(inplace_value);
     if (rc != RC::SUCCESS) {
       assert(false);
     }
 
-    values.push_back(value);
+    rc = common::try_convert_value(inplace_value, asgin_field.attr_type(), converted_value);
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
+
+    values.push_back(converted_value);
   }
 
   update_stmt->table_  = table;

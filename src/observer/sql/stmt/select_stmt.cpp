@@ -88,7 +88,7 @@ RC SelectStmt::resovle_attributes(const std::vector<ExpressionWithAliasSqlNode *
   // 生成tuple_schema
   tuple_schema_ = std::move(resolver.attr_tuple());
 
-  // aggregate_list_ = std::move(resolver.aggregate_desc());
+  aggregate_list_ = std::move(resolver.aggregate_desc());
 
   if (!resolver.subquery_cell_desc().empty()) {
     LOG_WARN("Subquery is not supported yet");

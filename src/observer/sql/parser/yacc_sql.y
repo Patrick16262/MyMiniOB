@@ -529,8 +529,6 @@ select_with_parenthesis : LBRACE select_stmt RBRACE
       $$->subquery = $2;
     }
 
-
-
 expression_list:
     expression
     {

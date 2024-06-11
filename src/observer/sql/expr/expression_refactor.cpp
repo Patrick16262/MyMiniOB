@@ -124,7 +124,7 @@ RC ExpressionStructValidator::validate(const ExpressionSqlNode *sql_node, State 
 }
 
 RC ExpressionStructRefactor::refactor(
-    std::vector<ExpressionSqlNode *> query_sql_list, const std::vector<ExpressionSqlNode *> &groupby)
+    std::vector<ExpressionSqlNode *> &query_sql_list, const std::vector<ExpressionSqlNode *> &groupby)
 {
   init();
   groupby_                 = groupby;
@@ -155,7 +155,7 @@ RC ExpressionStructRefactor::refactor(
     }
   }
 
-  for (auto sql_node : query_sql_list) {
+  for (auto &sql_node : query_sql_list) {
     RC rc = refactor_internal(sql_node);
     if (rc != RC::SUCCESS) {
       LOG_WARN("Failed to refactor expression struct, rc=%d:%s", rc, strrc(rc));
@@ -171,7 +171,14 @@ RC ExpressionStructRefactor::refactor(
 
 RC ExpressionStructRefactor::refactor(ExpressionSqlNode *&sql_node, const std::vector<ExpressionSqlNode *> &groupby)
 {
-  return refactor(vector{sql_node}, groupby);
+  vector tmp{sql_node};
+  RC     rc = refactor(tmp, groupby);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+
+  sql_node = tmp[0];
+  return RC::SUCCESS;
 }
 
 RC ExpressionStructRefactor::refactor_internal(ExpressionSqlNode *&sql_node)
@@ -226,15 +233,17 @@ RC ExpressionStructRefactor::refactor_internal(ExpressionSqlNode *&sql_node)
       // 如果是聚合函数，将其转换为Aggregate表达式
       if (common::is_aggregate_function(function_node->function_name.c_str())) {
         AggregateExpressionSqlNode *aggregate_node = new AggregateExpressionSqlNode();
-        aggregate_node->name                       = function_node->function_name;
         aggregate_node->aggregate_type             = common::get_aggregate_type(function_node->function_name.c_str());
         assert(aggregate_node->aggregate_type != AggregateType::INVALID);
         assert(function_node->param_exprs.size() == 1);
 
         aggregate_node->child = function_node->param_exprs[0];
+        aggregate_node->name  = function_node->name;
         function_node->param_exprs.clear();
 
         sql_node = aggregate_node;
+
+        function_node->param_exprs.clear();  // 先清空，防止delete将param_exprs中的表达式删除
         delete function_node;
 
         rc                     = refactor_internal(sql_node);
@@ -247,14 +256,11 @@ RC ExpressionStructRefactor::refactor_internal(ExpressionSqlNode *&sql_node)
     } break;
 
     case ExprType::AGGREGATE: {
-      AggregateExpressionSqlNode *aggregate_node = static_cast<AggregateExpressionSqlNode *>(sql_node);
-      ExpressionSqlNode          *child          = aggregate_node->child;
-      TupleCellExpressionSqlNode *outter_expr    = new TupleCellExpressionSqlNode;
-      TupleCellSpec               tuple_cell(aggregate_node->name.c_str());
-
-      aggregate_node->child = nullptr;
-      outter_expr->alias    = tuple_cell.alias();
-      delete aggregate_node;
+      AggregateExpressionSqlNode *aggregate_node       = static_cast<AggregateExpressionSqlNode *>(sql_node);
+      ExpressionSqlNode          *child                = aggregate_node->child;
+      TupleCellExpressionSqlNode *outter_expr          = new TupleCellExpressionSqlNode;
+      string                      tuple_ref_identifier = aggregate_node->name + to_string(rand());
+      TupleCellSpec               tuple_cell(tuple_ref_identifier.c_str());
 
       if (aggregate_node->aggregate_type == AggregateType::COUNT) {
         if (child->expr_type == ExprType::FIELD && static_cast<FieldExpressionSqlNode *>(child)->name == "*") {
@@ -276,7 +282,15 @@ RC ExpressionStructRefactor::refactor_internal(ExpressionSqlNode *&sql_node)
 
       aggregate_types_.push_back(aggregate_node->aggregate_type);
       aggregate_childs_.emplace_back(std::move(child));
+      aggregate_cells_.push_back(tuple_cell);
+
+      outter_expr->name  = aggregate_node->name;
+      outter_expr->alias = tuple_cell.alias();
+
       sql_node = outter_expr;
+
+      aggregate_node->child = nullptr;
+      delete aggregate_node;
 
       return RC::SUCCESS;
     } break;

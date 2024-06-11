@@ -29,6 +29,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/expression.h"
 #include "sql/expr/tuple_cell.h"
 #include "sql/parser/value.h"
+#include "sql/stmt/table_ref_desc.h"
 #include "storage/record/record.h"
 
 class Table;
@@ -263,7 +264,7 @@ public:
 
 private:
   std::vector<std::unique_ptr<Expression>> project_exprs_;
-  std::vector<TupleCellSpec>               tuple_schema_; // 用于记录投影的alias
+  std::vector<TupleCellSpec>               tuple_schema_;  // 用于记录投影的alias
   Tuple                                   *tuple_ = nullptr;
 };
 
@@ -546,11 +547,13 @@ private:
 class AggregateTupleManager
 {
 public:
-  AggregateTupleManager(std::vector<std::unique_ptr<Expression>> &aggr_exprs,
-      const std::vector<AggregateType> &aggr_types, const std::vector<TupleCellSpec> &aggr_specs)
-      : aggr_exprs_(std::move(aggr_exprs)), aggr_types_(aggr_types), aggr_specs_(aggr_specs)
+  AggregateTupleManager(std::vector<std::unique_ptr<AggregateDesc>> aggr_descs)
   {
-    assert(aggr_exprs.size() == aggr_types_.size() && aggr_types_.size() == aggr_specs_.size());
+    for (const auto &desc : aggr_descs) {
+      aggr_exprs_.push_back(std::move(desc->child()));
+      aggr_types_.push_back(desc->type());
+      aggr_specs_.push_back(desc->child_spec());
+    }
   }
 
   AggregateTuple generateTuple(const std::vector<Value> group_by)

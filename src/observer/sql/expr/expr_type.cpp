@@ -18,7 +18,7 @@ bool common::is_aggregate_function(const char *function_name)
 {
  stringstream ss;
  for (int i = 0; i < strlen(function_name); i++) {
-   ss << tolower(function_name[i]);
+   ss << (char) tolower(function_name[i]);
  }
 
  return aggregate_name_map.find(ss.str()) != aggregate_name_map.end();
@@ -43,7 +43,7 @@ AggregateType common::get_aggregate_type(const char *function_name)
 {
  stringstream ss;
  for (int i = 0; i < strlen(function_name); i++) {
-   ss << tolower(function_name[i]);
+   ss << (char)tolower(function_name[i]);
  }
 
  auto it = aggregate_name_map.find(ss.str());

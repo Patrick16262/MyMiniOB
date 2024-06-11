@@ -541,6 +541,23 @@ RC ProjectExpressionResovler::generate_projection_list(
         return rc;
       }
 
+      assert(refactor.aggregate_childs().size() == refactor.aggregate_cells().size());
+      assert(refactor.aggregate_types().size() == refactor.aggregate_cells().size());
+      vector aggregate_childs = std::move(refactor.aggregate_childs());
+      vector aggregate_cells  = std::move(refactor.aggregate_cells());
+      vector aggregate_types  = refactor.aggregate_types();
+
+      for (int i = 0; i < aggregate_childs.size(); i++) {
+        unique_ptr<Expression> aggr_child_expr;
+        rc = generator_.generate_expression(aggregate_childs[i].get(), aggr_child_expr);
+        if (rc != RC::SUCCESS) {
+          LOG_WARN("generate aggregate child expression failed rc = %d:%s", rc, strrc(rc));
+          return rc;
+        }
+        aggregate_desc_.push_back(
+            std::make_unique<AggregateDesc>(aggregate_types[i], std::move(aggr_child_expr), aggregate_cells[i]));
+      }
+
       query_exprs.push_back(std::move(expr));
       subquery_cell_desc_.insert(
           subquery_cell_desc_.end(), refactor.subquery_cells().begin(), refactor.subquery_cells().end());
@@ -552,13 +569,13 @@ RC ProjectExpressionResovler::generate_projection_list(
       // 生成tuple_schema
       FieldExpressionSqlNode *field = dynamic_cast<FieldExpressionSqlNode *>(sql_node->expr);
       if (field) {
-        resovled_attr_tuple_.emplace_back(
+        resovled_attr_tuple_specs_.emplace_back(
             field->field.relation_name.c_str(), field->field.attribute_name.c_str(), sql_node->alias.c_str());
       } else {
         if (!sql_node->alias.empty()) {
-          resovled_attr_tuple_.emplace_back(sql_node->alias.c_str());
+          resovled_attr_tuple_specs_.emplace_back(sql_node->alias.c_str());
         } else {
-          resovled_attr_tuple_.emplace_back(sql_node->expr->name.c_str());
+          resovled_attr_tuple_specs_.emplace_back(sql_node->expr->name.c_str());
         }
       }
     }
@@ -599,7 +616,7 @@ RC ProjectExpressionResovler::wildcard_fields(
         query_exprs.push_back(std::move(expr));
         delete temp_node;
 
-        resovled_attr_tuple_.push_back(TupleCellSpec(table_desc.table_name().c_str(), field.field_name().c_str()));
+        resovled_attr_tuple_specs_.push_back(TupleCellSpec(table_desc.table_name().c_str(), field.field_name().c_str()));
       }
     }
   } else {

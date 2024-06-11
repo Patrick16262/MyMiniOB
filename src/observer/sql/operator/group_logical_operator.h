@@ -1,18 +1,20 @@
 #pragma once
 
 #include "sql/operator/logical_operator.h"
+#include "sql/stmt/table_ref_desc.h"
+#include <memory>
+#include <utility>
+#include <vector>
 
 class GroupLogicalOperator : public LogicalOperator
 {
 public:
-  GroupLogicalOperator(std::vector<std::unique_ptr<Expression>> &aggr_exprs, std::vector<AggregateType> &aggr_types,
-      std::vector<TupleCellSpec> &aggr_specs)
-      : aggr_exprs_(std::move(aggr_exprs)), aggr_types_(std::move(aggr_types)), aggr_specs_(std::move(aggr_specs))
-  {}
+  GroupLogicalOperator( std::vector<std::unique_ptr<AggregateDesc>> descs) : aggr_descs_(std::move(descs)) {}
+
   virtual LogicalOperatorType type() const override { return LogicalOperatorType::GROUP; }
 
+   std::vector<std::unique_ptr<AggregateDesc>> &aggr_descs()  { return aggr_descs_; }
+
 private:
-  const std::vector<std::unique_ptr<Expression>> aggr_exprs_;
-  const std::vector<AggregateType>               aggr_types_;
-  const std::vector<TupleCellSpec>               aggr_specs_;
+  std::vector<std::unique_ptr<AggregateDesc>> aggr_descs_;
 };

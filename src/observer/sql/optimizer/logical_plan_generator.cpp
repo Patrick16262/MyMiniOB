@@ -23,6 +23,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/expression.h"
 #include "sql/operator/delete_logical_operator.h"
 #include "sql/operator/explain_logical_operator.h"
+#include "sql/operator/group_logical_operator.h"
 #include "sql/operator/insert_logical_operator.h"
 #include "sql/operator/join_logical_operator.h"
 #include "sql/operator/logical_operator.h"
@@ -65,7 +66,7 @@ RC LogicalPlanGenerator::create(Stmt *stmt, unique_ptr<LogicalOperator> &logical
       rc = create_plan(delete_stmt, logical_operator);
     } break;
 
-    case StmtType::UPDATE : {
+    case StmtType::UPDATE: {
       UpdateStmt *update_stmt = static_cast<UpdateStmt *>(stmt);
 
       rc = create_plan(update_stmt, logical_operator);
@@ -153,25 +154,53 @@ RC LogicalPlanGenerator::create_plan(TableStmt *table_stmt, unique_ptr<LogicalOp
 
 RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
-  ProjectLogicalOperator *project =
-      new ProjectLogicalOperator(select_stmt->project_expr_list(), select_stmt->tuple_schema());
+  unique_ptr<ProjectLogicalOperator> project =
+      make_unique<ProjectLogicalOperator>(select_stmt->project_expr_list(), select_stmt->tuple_schema());
+  unique_ptr<LogicalOperator> table_oper = nullptr;
+  unique_ptr<LogicalOperator> group_oper = nullptr;
+  unique_ptr<LogicalOperator> perdict    = nullptr;
 
   if (select_stmt->table_stmt()) {
-    unique_ptr<LogicalOperator> table_oper;
-    RC                          rc = create(select_stmt->table_stmt().get(), table_oper);
+    RC rc = create(select_stmt->table_stmt().get(), table_oper);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to create table operator. rc=%s", strrc(rc));
       return rc;
     }
+  }
 
-    project->add_child(std::move(table_oper));
+  if (!select_stmt->aggregate_list().empty()) {
+    group_oper = std::make_unique<GroupLogicalOperator>(std::move(select_stmt->aggregate_list()));
   }
 
   if (select_stmt->filter()) {
-    project->set_filter(std::move(select_stmt->filter()));
+    perdict = std::make_unique<PredicateLogicalOperator>(std::move(select_stmt->filter()));
   }
 
-  logical_operator.reset(project);
+  unique_ptr<LogicalOperator> child_oper = nullptr;
+  if (table_oper) {
+    child_oper = std::move(table_oper);
+  }
+
+  if (perdict) {
+    if (child_oper) {
+      perdict->add_child(std::move(child_oper));
+    }
+    child_oper = std::move(perdict);
+  }
+
+  if (group_oper) {
+    if (child_oper) {
+      group_oper->add_child(std::move(child_oper));
+    }
+    child_oper = std::move(group_oper);
+  }
+
+  if (child_oper) {
+    project->add_child(std::move(child_oper));
+  }
+
+  logical_operator = std::move(project);
+
   return RC::SUCCESS;
 }
 

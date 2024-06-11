@@ -14,10 +14,10 @@ RC GroupPhysicalOperator::open(Trx *trx)
 {
   assert(children_.size() == 1);
   map<vector<Value>, AggregateTuple> grouped_tuples;
-  vector<Value>                                current_group_by_values;
-  Tuple                                       *tuple = nullptr;
-  PhysicalOperator                            *child = children_[0].get();
-  RC                                           rc;
+  vector<Value>                      current_group_by_values;
+  Tuple                             *tuple = nullptr;
+  PhysicalOperator                  *child = children_[0].get();
+  RC                                 rc;
 
   rc = child->open(trx);
   if (rc != RC::SUCCESS) {
@@ -40,7 +40,8 @@ RC GroupPhysicalOperator::open(Trx *trx)
 
     auto it = grouped_tuples.find(current_group_by_values);
     if (it == grouped_tuples.end()) {
-      grouped_tuples.insert({std::move(current_group_by_values), tuple_factory_.generateTuple(current_group_by_values)});
+      grouped_tuples.insert(
+          {std::move(current_group_by_values), tuple_factory_.generateTuple(current_group_by_values)});
       it = grouped_tuples.find(current_group_by_values);
       assert(it != grouped_tuples.end());
     }
@@ -73,7 +74,7 @@ RC GroupPhysicalOperator::open(Trx *trx)
 
 RC GroupPhysicalOperator::next()
 {
-  if (current_tuple_index_ >= tuples_.size()) {
+  if (current_tuple_index_ >= (int)tuples_.size()) {
     return RC::RECORD_EOF;
   }
 
@@ -88,7 +89,8 @@ RC GroupPhysicalOperator::close()
   return RC::SUCCESS;
 }
 
-Tuple *GroupPhysicalOperator::current_tuple() {
+Tuple *GroupPhysicalOperator::current_tuple()
+{
   if (current_tuple_index_ < 0 || current_tuple_index_ >= tuples_.size()) {
     return nullptr;
   }

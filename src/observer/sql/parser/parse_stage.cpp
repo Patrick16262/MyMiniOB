@@ -52,7 +52,9 @@ RC ParseStage::handle_request(SQLStageEvent *sql_event)
     // set error information to event
     rc = RC::SQL_SYNTAX;
     sql_result->set_return_code(rc);
+#ifdef DEBUG
     sql_result->set_state_string("Failed to parse sql");
+#endif
     return rc;
   }
 

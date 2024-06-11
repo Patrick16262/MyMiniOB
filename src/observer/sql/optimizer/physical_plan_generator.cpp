@@ -26,6 +26,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/delete_physical_operator.h"
 #include "sql/operator/explain_logical_operator.h"
 #include "sql/operator/explain_physical_operator.h"
+#include "sql/operator/group_physical_operator.h"
 #include "sql/operator/hash_join_physical_operator.h"
 #include "sql/operator/index_scan_physical_operator.h"
 #include "sql/operator/insert_logical_operator.h"
@@ -82,6 +83,10 @@ RC PhysicalPlanGenerator::create(LogicalOperator &logical_operator, unique_ptr<P
 
     case LogicalOperatorType::JOIN: {
       return create_plan(static_cast<JoinLogicalOperator &>(logical_operator), oper);
+    } break;
+
+    case LogicalOperatorType::GROUP: {
+      return create_plan(static_cast<GroupLogicalOperator &>(logical_operator), oper);
     } break;
 
     default: {
@@ -376,4 +381,27 @@ RC PhysicalPlanGenerator::create_plan(UpdateLogicalOperator &logical_oper, std::
 
   oper = std::move(update_phyis_opr);
   return RC::SUCCESS;
+}
+
+RC PhysicalPlanGenerator::create_plan(GroupLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper)
+{
+  RC rc;
+
+  unique_ptr<PhysicalOperator> child_physical_oper;
+
+  if (logical_oper.children().empty()) {
+    LOG_WARN("Aggregation operator without table has not been implemented yet.");
+    return RC::UNIMPLENMENT;
+  }
+
+  rc = create(*logical_oper.children().front(), child_physical_oper);
+
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to create child physical operator of group operator. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  oper = std::make_unique< GroupPhysicalOperator>(std::move(logical_oper.aggr_descs()));
+  oper->add_child(std::move(child_physical_oper));
+  return rc;
 }

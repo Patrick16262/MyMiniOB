@@ -73,7 +73,7 @@ private:
 class AggregateDesc
 {
 public:
-  AggregateDesc(AggregateType type, std::unique_ptr<Expression> &child, const TupleCellSpec &child_spec)
+  AggregateDesc(AggregateType type, std::unique_ptr<Expression> child, const TupleCellSpec &child_spec)
       : type_(type), child_(std::move(child)), child_spec_(child_spec)
   {}
 
