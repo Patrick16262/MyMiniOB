@@ -76,12 +76,12 @@ RC GroupPhysicalOperator::open(Trx *trx)
 
 RC GroupPhysicalOperator::next()
 {
-  if (current_tuple_index_ >= (int)tuples_.size()) {
+  if (current_tuple_index_ + 1 < (int)tuples_.size()) {
+    current_tuple_index_ += 1;
+    return RC::SUCCESS;
+  } else {
     return RC::RECORD_EOF;
   }
-
-  current_tuple_index_++;
-  return RC::SUCCESS;
 }
 
 RC GroupPhysicalOperator::close()

@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include <csignal>
 #include <string>
 #include <memory>
 
@@ -23,6 +24,8 @@ struct ConnectionContext;
 class SessionEvent;
 class Session;
 class BufferedWriter;
+class Communicator;
+
 
 /**
  * @defgroup Communicator
@@ -42,6 +45,7 @@ class BufferedWriter;
 class Communicator
 {
 public:
+
   virtual ~Communicator();
 
   /**

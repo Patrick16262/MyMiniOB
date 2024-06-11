@@ -107,8 +107,17 @@ RC RoundFunction::check_params() const
 
 float RoundFunction::do_round(float num, int precision) const
 {
-  float factor = pow(10, precision);
-  return round(num * factor) / factor;
+  float factor       = pow(10, precision);
+  float upperred_num = num * factor;
+
+  int   fractional_part = static_cast<int>(upperred_num);
+  float truncated_half = upperred_num - fractional_part - 0.5;
+
+  if ((truncated_half > 1e-5) || (truncated_half < 1e-5 && truncated_half > -1e-5 && fractional_part % 2 == 1)) {
+    fractional_part += 1;
+  }
+
+  return (float)fractional_part / factor;
 }
 
 RC DateFormatFunction::function_body(std::vector<Value> params, Value &result) const
@@ -147,7 +156,8 @@ RC DateFormatFunction::function_body(std::vector<Value> params, Value &result) c
   return RC::SUCCESS;
 }
 
-RC DateFormatFunction::check_params() const {
+RC DateFormatFunction::check_params() const
+{
   if (FunctionExpression::param_exprs_.size() != 2) {
     LOG_WARN("Invalid number of parameters for date_format function, expected 2, got %zu", FunctionExpression::param_exprs_.size());
     return RC::INVALID_ARGUMENT;
