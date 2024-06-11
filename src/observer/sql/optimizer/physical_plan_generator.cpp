@@ -250,10 +250,10 @@ RC PhysicalPlanGenerator::create_plan(DeleteLogicalOperator &delete_oper, unique
   }
 
   oper = unique_ptr<PhysicalOperator>(new DeletePhysicalOperator(delete_oper.table()));
-  
+
   if (perdict) {
-    perdict->add_child(std::move(oper));
-    oper = std::move(perdict);
+    perdict->add_child(std::move(child_physical_oper));
+    oper->add_child(std::move(perdict));
   } else {
     oper->add_child(std::move(child_physical_oper));
   }
