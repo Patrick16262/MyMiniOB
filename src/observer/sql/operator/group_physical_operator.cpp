@@ -4,7 +4,6 @@
 #include "sql/operator/physical_operator.h"
 #include "sql/parser/value.h"
 #include <cassert>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -62,6 +61,9 @@ RC GroupPhysicalOperator::open(Trx *trx)
   for (auto &it : grouped_tuples) {
     tuples_.push_back(std::move(it.second));
   }
+  if (tuples_.empty() && group_exprs.empty()) {
+    tuples_.push_back(tuple_factory_.generateTuple({}));
+  }
 
   rc = child->close();
   if (rc != RC::SUCCESS) {
@@ -91,6 +93,7 @@ RC GroupPhysicalOperator::close()
 
 Tuple *GroupPhysicalOperator::current_tuple()
 {
+
   if (current_tuple_index_ < 0 || current_tuple_index_ >= tuples_.size()) {
     return nullptr;
   }
