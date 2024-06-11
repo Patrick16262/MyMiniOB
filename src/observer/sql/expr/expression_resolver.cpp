@@ -506,7 +506,7 @@ RC WhereConditionExpressionResolver::resolve(ExpressionSqlNode *sql_node, std::u
 /**
  * @brief 查询列表生成器
  */
-RC ProjectExpressionResovler::generate_projection_list(
+RC ProjectExpressionResovler::resolve_projection_list(
     const vector<ExpressionWithAliasSqlNode *> &sql_nodes, vector<unique_ptr<Expression>> &query_exprs)
 {
   vector<unique_ptr<Expression>> tmp_exprs;
@@ -581,6 +581,11 @@ RC ProjectExpressionResovler::generate_projection_list(
     }
   }
 
+  if (aggregate_desc_.size() != sql_nodes.size() && !aggregate_desc_.empty()) {
+    LOG_WARN("aggregate function cannot be mixed with other expressions");
+    return RC::INVALID_AGGREGATE;
+  }
+
   return RC::SUCCESS;
 }
 
@@ -616,7 +621,8 @@ RC ProjectExpressionResovler::wildcard_fields(
         query_exprs.push_back(std::move(expr));
         delete temp_node;
 
-        resovled_attr_tuple_specs_.push_back(TupleCellSpec(table_desc.table_name().c_str(), field.field_name().c_str()));
+        resovled_attr_tuple_specs_.push_back(
+            TupleCellSpec(table_desc.table_name().c_str(), field.field_name().c_str()));
       }
     }
   } else {

@@ -157,7 +157,7 @@ public:
   }
   virtual ~ProjectExpressionResovler() = default;
 
-  RC generate_projection_list(
+  RC resolve_projection_list(
     const vector<ExpressionWithAliasSqlNode *> &sql_nodes, vector<unique_ptr<Expression>> &query_exprs);
 
 public:

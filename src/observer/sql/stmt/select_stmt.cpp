@@ -79,7 +79,7 @@ RC SelectStmt::resovle_attributes(const std::vector<ExpressionWithAliasSqlNode *
 {
   ProjectExpressionResovler resolver(db_, table_descs_, outter_tuple_schema_, group_exprs_);
 
-  RC rc = resolver.generate_projection_list(attributes, project_expr_list_);
+  RC rc = resolver.resolve_projection_list(attributes, project_expr_list_);
   if (rc != RC::SUCCESS) {
     LOG_WARN("Failed to resolve expression, rc=%s", strrc(rc));
     return rc;
