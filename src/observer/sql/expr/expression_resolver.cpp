@@ -541,21 +541,10 @@ RC ProjectExpressionResovler::resolve_projection_list(
         return rc;
       }
 
-      assert(refactor.aggregate_childs().size() == refactor.aggregate_cells().size());
-      assert(refactor.aggregate_types().size() == refactor.aggregate_cells().size());
-      vector aggregate_childs = std::move(refactor.aggregate_childs());
-      vector aggregate_cells  = std::move(refactor.aggregate_cells());
-      vector aggregate_types  = refactor.aggregate_types();
-
-      for (int i = 0; i < aggregate_childs.size(); i++) {
-        unique_ptr<Expression> aggr_child_expr;
-        rc = generator_.generate_expression(aggregate_childs[i].get(), aggr_child_expr);
-        if (rc != RC::SUCCESS) {
-          LOG_WARN("generate aggregate child expression failed rc = %d:%s", rc, strrc(rc));
-          return rc;
-        }
-        aggregate_desc_.push_back(
-            std::make_unique<AggregateDesc>(aggregate_types[i], std::move(aggr_child_expr), aggregate_cells[i]));
+      rc = push_groupping(refactor);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("push groupping failed rc = %d:%s", rc, strrc(rc));
+        return rc;
       }
 
       query_exprs.push_back(std::move(expr));
@@ -579,11 +568,6 @@ RC ProjectExpressionResovler::resolve_projection_list(
         }
       }
     }
-  }
-
-  if (aggregate_desc_.size() != sql_nodes.size() && !aggregate_desc_.empty()) {
-    LOG_WARN("aggregate function cannot be mixed with other expressions");
-    return RC::INVALID_AGGREGATE;
   }
 
   return RC::SUCCESS;
@@ -651,6 +635,42 @@ RC ProjectExpressionResovler::wildcard_fields(
       }
     }
     return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
+
+  return RC::SUCCESS;
+}
+
+RC ProjectExpressionResovler::push_groupping(ExpressionStructRefactor &refactor)
+{
+  RC rc;
+
+  assert(refactor.aggregate_childs().size() == refactor.aggregate_cells().size());
+  assert(refactor.aggregate_types().size() == refactor.aggregate_cells().size());
+  vector aggregate_childs = std::move(refactor.aggregate_childs());
+  vector aggregate_cells  = std::move(refactor.aggregate_cells());
+  vector aggregate_types  = refactor.aggregate_types();
+
+  if ((must_not_aggregate && !aggregate_childs.empty()) || (must_aggregate && aggregate_childs.empty())) {
+    LOG_WARN("aggregate function with non-aggregate fields is not allowed");
+    return RC::INVALID_AGGREGATE;
+  }
+
+  if (aggregate_childs.empty()) {
+    must_not_aggregate = true;
+    return RC::SUCCESS;
+  } else {
+    must_aggregate = true;
+  }
+
+  for (int i = 0; i < aggregate_childs.size(); i++) {
+    unique_ptr<Expression> aggr_child_expr;
+    rc = generator_.generate_expression(aggregate_childs[i].get(), aggr_child_expr);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("generate aggregate child expression failed rc = %d:%s", rc, strrc(rc));
+      return rc;
+    }
+    aggregate_desc_.push_back(
+        std::make_unique<AggregateDesc>(aggregate_types[i], std::move(aggr_child_expr), aggregate_cells[i]));
   }
 
   return RC::SUCCESS;

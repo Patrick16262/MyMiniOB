@@ -40,7 +40,10 @@ public:
   }
   virtual ~ExpressionGenerator() = default;
 
-  void set_attr_schema(std::vector<TupleCellSpec> current_tuple_schema) { current_tuple_schema_ = std::move(current_tuple_schema); }
+  void set_attr_schema(std::vector<TupleCellSpec> current_tuple_schema)
+  {
+    current_tuple_schema_ = std::move(current_tuple_schema);
+  }
 
   RC generate_expression(const ExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr);
 
@@ -60,10 +63,10 @@ private:
   RC generate_expression(const ExistsExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr);
 
 private:
-  std::unordered_multimap<std::string, TableFactorDesc> field_table_map_;   // 字段->表
-  std::unordered_set<std::string>                       outter_alias_set_;  // 父查询中的别名
-  std::vector<TupleCellSpec>                            current_tuple_schema_; // 当前查询的schema
-  Db                                                   *db_ = nullptr;      // nullable
+  std::unordered_multimap<std::string, TableFactorDesc> field_table_map_;       // 字段->表
+  std::unordered_set<std::string>                       outter_alias_set_;      // 父查询中的别名
+  std::vector<TupleCellSpec>                            current_tuple_schema_;  // 当前查询的schema
+  Db                                                   *db_ = nullptr;          // nullable
 };
 
 /**
@@ -107,9 +110,10 @@ class WhereConditionExpressionResolver
 public:
   WhereConditionExpressionResolver(
       Db *db, std::vector<TableFactorDesc> table_desc, std::vector<TupleCellSpec> tuple_schema)
-      : generator_(db, table_desc), db_(db), table_desc_(std::move(table_desc)), tuple_schema_(tuple_schema){
-        generator_.set_attr_schema(tuple_schema);
-      };
+      : generator_(db, table_desc), db_(db), table_desc_(std::move(table_desc)), tuple_schema_(tuple_schema)
+  {
+    generator_.set_attr_schema(tuple_schema);
+  };
   virtual ~WhereConditionExpressionResolver() = default;
 
   RC resolve(ExpressionSqlNode *sql_node, std::unique_ptr<Expression> &expr);
@@ -158,7 +162,7 @@ public:
   virtual ~ProjectExpressionResovler() = default;
 
   RC resolve_projection_list(
-    const vector<ExpressionWithAliasSqlNode *> &sql_nodes, vector<unique_ptr<Expression>> &query_exprs);
+      const vector<ExpressionWithAliasSqlNode *> &sql_nodes, vector<unique_ptr<Expression>> &query_exprs);
 
 public:
   std::vector<SubqueryType>                          &subquery_types() { return subquery_types_; }
@@ -169,6 +173,7 @@ public:
 
 private:
   RC wildcard_fields(FieldExpressionSqlNode *wildcard_expression, vector<unique_ptr<Expression>> &query_exprs);
+  RC push_groupping(ExpressionStructRefactor &refactor);
 
 private:
   std::vector<SubqueryType>                          subquery_types_;
@@ -186,4 +191,7 @@ private:
   std::vector<TableFactorDesc>     table_desc_;
   std::vector<TupleCellSpec>       outter_tuple_;
   std::vector<ExpressionSqlNode *> group_exprs_;
+
+  bool must_aggregate     = false;
+  bool must_not_aggregate = false;
 };
