@@ -196,6 +196,9 @@ INVISIBLE FIELDS WILL BE PRINTED IN DEBUG MODE
 
 int main(int argc, char **argv)
 {
+  process_argc = argc;
+  process_argv = argv;
+  
   int rc = STATUS_SUCCESS;
 
   cout << startup_tips;

@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include <assert.h>
+#include <cstdio>
 #include <errno.h>
 #include <pthread.h>
 #include <string.h>
@@ -59,13 +60,13 @@ typedef enum
 class LogClient
 {
 public:
-  LogClient(const std::string &log_file_name) : log_file_name_(log_file_name){};
+  LogClient(const std::string &log_file_name) : log_file_name_(log_file_name) {  };
   int connect();
   int sync();
 
 private:
   int              client_fd_ = 0;
-  static const int BUF_SIZE  = 1024 * 64;
+  static const int BUF_SIZE   = 1024 * 64;
   char             buf_[BUF_SIZE];
   int              log_file_offset_ = 0;
   std ::string     log_file_name_;

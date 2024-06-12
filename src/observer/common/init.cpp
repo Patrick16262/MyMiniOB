@@ -28,9 +28,14 @@ See the Mulan PSL v2 for more details. */
 #include "storage/buffer/disk_buffer_pool.h"
 #include "storage/default/default_handler.h"
 #include "storage/trx/trx.h"
+#include <cstdio>
+#include <sstream>
 
 using namespace std;
 using namespace common;
+
+int    process_argc;
+char **process_argv;
 
 bool *&_get_init()
 {
@@ -79,6 +84,7 @@ int init_log(ProcessParam *process_cfg, Ini &properties)
     }
 
     log_file_name = getAboslutPath(log_file_name.c_str());
+    ::remove(log_file_name.c_str());
 
     LOG_LEVEL log_level = LOG_LEVEL_INFO;
     key                 = ("LOG_FILE_LEVEL");
@@ -129,10 +135,7 @@ void cleanup_log()
   }
 }
 
-int prepare_init_seda()
-{
-  return 0;
-}
+int prepare_init_seda() { return 0; }
 
 int init_global_objects(ProcessParam *process_param, Ini &properties)
 {
@@ -140,9 +143,8 @@ int init_global_objects(ProcessParam *process_param, Ini &properties)
 
   int ret = 0;
 
-  RC rc = GCTX.handler_->init("miniob", 
-                              process_param->trx_kit_name().c_str(),
-                              process_param->durability_mode().c_str());
+  RC rc =
+      GCTX.handler_->init("miniob", process_param->trx_kit_name().c_str(), process_param->durability_mode().c_str());
   if (OB_FAIL(rc)) {
     LOG_ERROR("failed to init handler. rc=%s", strrc(rc));
     return -1;
@@ -195,8 +197,23 @@ int init(ProcessParam *process_param)
     return rc;
   }
 
+  stringstream logfile_header_ss;
+  logfile_header_ss << R"( 
+    ==================
+    === MiniOB LOG ===
+    ================== 
+    )" << endl;
+  logfile_header_ss << "oringal param: " << endl;
+  for (int i = 0; i < process_argc; i++) {
+    logfile_header_ss << process_argv[i] << " ";
+  }
+  logfile_header_ss << endl;
+
+  LOG_INFO("%s", logfile_header_ss.str().c_str());
+
   string conf_data;
   get_properties()->to_string(conf_data);
+
   LOG_INFO("Output configuration \n%s", conf_data.c_str());
 
   rc = init_global_objects(process_param, *get_properties());
