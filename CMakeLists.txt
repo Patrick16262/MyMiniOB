@@ -33,7 +33,7 @@ OPTION(ENABLE_NOPIE "Enable no pie" OFF)
 OPTION(CONCURRENCY "Support concurrency operations" ON)
 OPTION(STATIC_STDLIB "Link std library static or dynamic, such as libgcc, libstdc++, libasan" OFF)
 
-SET(CONCURRENCY ON)
+set(CMAKE_BUILD_PARALLEL_LEVEL 20)
 
 # ==================
 # === Compiler =====

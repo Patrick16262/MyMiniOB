@@ -29,6 +29,26 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "NonConcurrent",
+            "program": "${workspaceFolder}/${defaultBuildTask}/bin/observer",
+            "args": [
+                "-f",
+                "${workspaceFolder}/etc/observer.ini",
+                "-P",
+                "cli",
+                "-d",
+                "disk"
+            ],
+            "cwd": "${workspaceFolder}/${defaultBuildTask}/",
+            "preLaunchTask": "${defaultBuildTask}",
+            "terminal": "integrated",
+            "presentation": {
+                "clear": true
+            }
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Server MySQL",
             "program": "${workspaceFolder}/${defaultBuildTask}/bin/observer",
             "args": [

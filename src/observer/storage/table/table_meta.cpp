@@ -77,7 +77,7 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
 
     sys_field_num += static_cast<int>(trx_fields->size());
   } else {
-    fields_.resize(attributes.size());
+    fields_.resize(attributes.size() + 1);
   }
 
   rc = fields_[sys_field_num - 1].init("__null_bitmap", INTS, field_offset, 4, false, false);
