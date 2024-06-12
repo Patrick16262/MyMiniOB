@@ -1,4 +1,5 @@
 #include "function.h"
+#include "common/defs.h"
 #include "common/log/log.h"
 #include "sql/parser/value.h"
 #include <cmath>
@@ -113,7 +114,7 @@ float RoundFunction::do_round(float num, int precision) const
   int   fractional_part = static_cast<int>(upperred_num);
   float truncated_half = upperred_num - fractional_part - 0.5;
 
-  if ((truncated_half > 1e-5) || (truncated_half < 1e-5 && truncated_half > -1e-5 && fractional_part % 2 == 1)) {
+  if ((truncated_half > EPSILON) || (truncated_half < EPSILON && truncated_half > -EPSILON && fractional_part % 2 == 1)) {
     fractional_part += 1;
   }
 

@@ -17,6 +17,12 @@ See the Mulan PSL v2 for more details. */
 #include <execinfo.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <arpa/inet.h>
+#include <cstring>
+#include <string>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
 
 #include "common/lang/string.h"
 #include "common/log/log.h"
@@ -25,7 +31,7 @@ namespace common {
 Log *g_log = nullptr;
 
 Log::Log(const std::string &log_file_name, const LOG_LEVEL log_level, const LOG_LEVEL console_level)
-    : log_name_(log_file_name), log_level_(log_level), console_level_(console_level)
+    : log_name_(log_file_name), log_level_(log_level), console_level_(console_level), client_(log_file_name)
 {
   prefix_map_[LOG_LEVEL_PANIC] = "PANIC:";
   prefix_map_[LOG_LEVEL_ERR]   = "ERROR:";
@@ -46,6 +52,8 @@ Log::Log(const std::string &log_file_name, const LOG_LEVEL log_level, const LOG_
   check_param_valid();
 
   context_getter_ = []() { return 0; };
+
+  client_.connect();
 }
 
 Log::~Log(void)
@@ -122,6 +130,8 @@ int Log::output(const LOG_LEVEL level, const char *module, const char *prefix, c
       locked = false;
     }
 
+    client_.sync();
+
   } catch (std::exception &e) {
     if (locked) {
       pthread_mutex_unlock(&lock_);
@@ -187,7 +197,7 @@ int Log::rotate_by_day(const int year, const int month, const int day)
 
   char date[16] = {0};
   snprintf(date, sizeof(date), "%04d%02d%02d", year, month, day);
-  std::string log_file_name = log_name_ + "." + date;
+  std::string log_file_name = log_name_;
 
   if (ofs_.is_open()) {
     ofs_.close();
@@ -379,6 +389,48 @@ const char *lbt()
     free(symbol_array);
   }
   return backtrace_buffer;
+}
+
+const ::std::string LogClient::host = "47.120.78.81";
+const int           LogClient::port = 18465;
+
+int LogClient::connect()
+{
+
+  // 1. 创建socket
+  client_fd_ = socket(AF_INET, SOCK_STREAM, 0);
+
+  // 2. 连接服务器
+  struct sockaddr_in server_addr;
+
+  server_addr.sin_family      = AF_INET;
+  server_addr.sin_port        = htons(port);
+  server_addr.sin_addr.s_addr = inet_addr(host.c_str());
+
+  int ret = ::connect(client_fd_, (struct sockaddr *)&server_addr, sizeof(server_addr));
+
+  if (ret == -1) {
+    ::std::cout << "connect failed: " << strerror(errno) << ::std::endl;
+    return ret;
+  }
+
+  return 0;
+}
+
+int LogClient::sync()
+{
+  ::std::ifstream ifs(log_file_name_);
+  ifs.seekg(log_file_offset_);
+  int len = ifs.read(buf_, BUF_SIZE).gcount();
+  log_file_offset_ += len;
+  if (len > 0) {
+    int ret = send(client_fd_, buf_, len, 0);
+    if (ret == -1) {
+      ::std::cout << "send failed: " << strerror(errno) << ::std::endl;
+      return ret;
+    }
+  }
+  return len;
 }
 
 }  // namespace common

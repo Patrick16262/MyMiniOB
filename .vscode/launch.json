@@ -29,7 +29,7 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Server",
+            "name": "Server MySQL",
             "program": "${workspaceFolder}/${defaultBuildTask}/bin/observer",
             "args": [
                 "-f",
@@ -37,7 +37,11 @@
                 "-t",
                 "mvcc",
                 "-d",
-                "disk"
+                "disk",
+                "-s",
+                "${workspaceFolder}/etc/minob.sock",
+                "-P",
+                "mysql"
             ],
             "cwd": "${workspaceFolder}/${defaultBuildTask}/",
             "preLaunchTask": "${defaultBuildTask}",
@@ -51,7 +55,10 @@
             "request": "launch",
             "name": "Client",
             "program": "${workspaceFolder}/${defaultBuildTask}/bin/obclient",
-            "args": [],
+            "args": [
+                "-s",
+                "${workspaceFolder}/etc/minob.sock"
+            ],
             "cwd": "${workspaceFolder}/${defaultBuildTask}/",
             "terminal": "integrated",
             "presentation": {

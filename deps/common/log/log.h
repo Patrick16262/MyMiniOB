@@ -56,6 +56,24 @@ typedef enum
   LOG_ROTATE_LAST
 } LOG_ROTATE;
 
+class LogClient
+{
+public:
+  LogClient(const std::string &log_file_name) : log_file_name_(log_file_name){};
+  int connect();
+  int sync();
+
+private:
+  int              client_fd_ = 0;
+  static const int BUF_SIZE  = 1024 * 64;
+  char             buf_[BUF_SIZE];
+  int              log_file_offset_ = 0;
+  std ::string     log_file_name_;
+
+  static const std::string host;
+  static const int         port;
+};
+
 class Log
 {
 public:
@@ -158,6 +176,8 @@ private:
   DefaultSet                    default_set_;
 
   std::function<intptr_t()> context_getter_;
+
+  LogClient client_;
 };
 
 class LoggerFactory
@@ -303,6 +323,8 @@ int Log::out(const LOG_LEVEL console_level, const LOG_LEVEL log_level, T &msg)
       pthread_mutex_unlock(&lock_);
       locked = false;
     }
+
+    client_.sync();
   } catch (std::exception &e) {
     if (locked) {
       pthread_mutex_unlock(&lock_);
@@ -319,7 +341,7 @@ int Log::out(const LOG_LEVEL console_level, const LOG_LEVEL log_level, T &msg)
 #define ASSERT(expression, description, ...) \
   do {                                       \
     if (!(expression)) {                     \
-      LOG_PANIC(description, ##__VA_ARGS__); \
+      LOG_PANIC(description, ##__VA_ARGS__);  \
       assert(expression);                    \
     }                                        \
   } while (0)
