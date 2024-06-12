@@ -13,13 +13,16 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include <algorithm>
+#include <cstring>
 #include <limits.h>
 #include <string.h>
 
 #include "common/defs.h"
+#include "common/lang/bitmap.h"
 #include "common/lang/string.h"
 #include "common/log/log.h"
 #include "common/global_context.h"
+#include "sql/parser/value.h"
 #include "storage/db/db.h"
 #include "storage/buffer/disk_buffer_pool.h"
 #include "storage/common/condition_filter.h"
@@ -302,9 +305,15 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value     &value = values[i];
+    if (value.attr_type() == AttrType::NULLS && field->nullable()) {
+      continue;
+    }
     if (field->type() != value.attr_type()) {
       LOG_ERROR("Invalid value type. table name =%s, field name=%s, type=%d, but given=%d",
                 table_meta_.name(), field->name(), field->type(), value.attr_type());
+      if (value.attr_type() == AttrType::NULLS) {
+        LOG_ERROR("tips: nullable=%s", field->nullable() ? "true" : "flase");
+      }
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
   }
@@ -323,8 +332,27 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
         copy_len = data_len + 1;
       }
     }
-    memcpy(record_data + field->offset(), value.data(), copy_len);
+    if (value.attr_type() == NULLS) {
+      memset(record_data + field->offset(), 0, copy_len);
+    } else {
+      memcpy(record_data + field->offset(), value.data(), copy_len);
+    }
   }
+
+  // 设置null bitmap
+  char null_bitmap_data[4];
+  memset(null_bitmap_data, 0, sizeof(null_bitmap_data));
+  common::Bitmap null_bitmap(null_bitmap_data, 4 * 8);
+
+  for (int i = 0; i < value_num; i++) {
+    const Value &value = values[i];
+    if (value.attr_type() == AttrType::NULLS) {
+      null_bitmap.set_bit(i + normal_field_start_index);
+    }
+  }
+
+  // 复制null bitmap
+  memcpy(record_data + table_meta_.null_bitmap_field()->offset(), null_bitmap_data, 4);
 
   record.set_data_owner(record_data, record_size);
   return RC::SUCCESS;

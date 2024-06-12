@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/operator/table_scan_physical_operator.h"
 #include "event/sql_debug.h"
+#include "sql/parser/value.h"
 #include "storage/table/table.h"
 #include "storage/trx/trx.h"
 
@@ -86,7 +87,13 @@ RC TableScanPhysicalOperator::filter(RowTuple &tuple, bool &result)
       return rc;
     }
 
-    bool tmp_result = value.get_boolean();
+    bool tmp_result;
+    try {
+      tmp_result = value.get_boolean();
+    } catch (null_cast_exception) {
+      tmp_result = false;
+    }
+    
     if (!tmp_result) {
       result = false;
       return rc;

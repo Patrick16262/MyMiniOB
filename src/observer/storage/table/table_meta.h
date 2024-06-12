@@ -52,6 +52,8 @@ public:
   const FieldMeta *find_field_by_offset(int offset) const;
   auto             field_metas() const -> const std::vector<FieldMeta>             *{ return &fields_; }
   auto             trx_fields() const -> std::span<const FieldMeta>;
+  
+  const FieldMeta *null_bitmap_field() const;
 
   int field_num() const;  // sys field included
   int sys_field_num() const;
@@ -63,6 +65,8 @@ public:
 
   int record_size() const;
 
+  bool nullable() const { return nullable_; }
+
 public:
   int  serialize(std::ostream &os) const override;
   int  deserialize(std::istream &is) override;
@@ -73,9 +77,11 @@ public:
 protected:
   int32_t                table_id_ = -1;
   std::string            name_;
-  std::vector<FieldMeta> trx_fields_;
+  std::vector<FieldMeta> sys_fields_;
   std::vector<FieldMeta> fields_;  // 包含sys_fields
   std::vector<IndexMeta> indexes_;
+
+  bool nullable_;
 
   int record_size_ = 0;
 };

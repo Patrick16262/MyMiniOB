@@ -24,7 +24,7 @@ InsertStmt::InsertStmt(Table *table, const Value *values, int value_amount)
     : table_(table), values_(values), value_amount_(value_amount)
 {}
 
-RC make_values(const vector<Value> &values, const TableMeta& meta, Value *&res, int &res_size);
+RC make_values(const vector<Value> &values, const TableMeta &meta, Value *&res, int &res_size);
 
 RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
 {
@@ -43,10 +43,10 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  //make values
-  Value *values = nullptr;
-  int value_num = 0;
-  RC rc = make_values(inserts.values, table->table_meta(), values, value_num);
+  // make values
+  Value *values    = nullptr;
+  int    value_num = 0;
+  RC     rc        = make_values(inserts.values, table->table_meta(), values, value_num);
   if (rc != RC::SUCCESS) {
     LOG_WARN("make values failed. rc=%d", rc);
     return rc;
@@ -60,17 +60,17 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
 /**
  * @brief 将插入的数据转换为合法的Value数组
  */
-RC make_values(const vector<Value> &values, const TableMeta& meta, Value *&res, int &res_size)
+RC make_values(const vector<Value> &values, const TableMeta &meta, Value *&res, int &res_size)
 {
   // check the fields number
-  const int        value_num  = static_cast<int>(values.size());
-  const int        field_num  = meta.field_num() - meta.sys_field_num();
+  const int value_num = static_cast<int>(values.size());
+  const int field_num = meta.field_num() - meta.sys_field_num();
   if (field_num != value_num) {
     LOG_WARN("schema mismatch. value num=%d, field num in schema=%d", value_num, field_num);
     return RC::SCHEMA_FIELD_MISSING;
   }
 
-  res = new Value[value_num];
+  res      = new Value[value_num];
   res_size = value_num;
 
   // check fields type
@@ -79,7 +79,12 @@ RC make_values(const vector<Value> &values, const TableMeta& meta, Value *&res, 
     const FieldMeta *field_meta = meta.field(i + sys_field_num);
     const AttrType   field_type = field_meta->type();
     const AttrType   value_type = values[i].attr_type();
-    if (field_type == value_type) {
+    if (value_type == AttrType::NULLS && field_meta->nullable()) {
+      res[i] = values[i];
+    } else if (value_type == AttrType::NULLS && !field_meta->nullable()) {
+      LOG_WARN("field is not nullable. field name=%s", field_meta->name());
+      return RC::SCHEMA_FIELD_NON_NULL;
+    } else if (field_type == value_type) {
       res[i] = values[i];
     } else {
       RC rc = common::try_convert_value(values[i], field_type, res[i]);

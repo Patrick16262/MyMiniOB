@@ -43,6 +43,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/table_scan_physical_operator.h"
 #include "sql/operator/update_physical_operator.h"
 #include "sql/optimizer/logical_plan_generator.h"
+#include "sql/parser/value.h"
 #include "sql/optimizer/physical_plan_generator.h"
 
 using namespace std;
@@ -115,7 +116,8 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
       unique_ptr<Expression> &left_expr  = comparison_expr->left();
       unique_ptr<Expression> &right_expr = comparison_expr->right();
       // 左右比较的一边最少是一个值
-      if (left_expr->type() != ExprType::VALUE && right_expr->type() != ExprType::VALUE) {
+      if (!((left_expr->type() == ExprType::VALUE && left_expr->value_type() != NULLS) ||
+              (right_expr->type() == ExprType::VALUE && right_expr->value_type() != NULLS))) {
         continue;
       }
 
@@ -401,7 +403,7 @@ RC PhysicalPlanGenerator::create_plan(GroupLogicalOperator &logical_oper, std::u
     return rc;
   }
 
-  oper = std::make_unique< GroupPhysicalOperator>(std::move(logical_oper.aggr_descs()));
+  oper = std::make_unique<GroupPhysicalOperator>(std::move(logical_oper.aggr_descs()));
   oper->add_child(std::move(child_physical_oper));
   return rc;
 }

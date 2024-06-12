@@ -190,6 +190,7 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
 %type <expression_with_alias_list> query_expression_list
 %type <update_asgn_factor>  update_asgn_factor
 %type <update_asgn_list>    update_asgn_list
+%type <booleans>            opt_nullable
 
 %left IS
 %nonassoc LIKE
@@ -350,20 +351,22 @@ attr_def_list:
     ;
     
 attr_def:
-    ID type LBRACE number RBRACE 
+    ID type LBRACE number RBRACE opt_nullable
     {
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = $4;
+      $$->nullable = $6;
       free($1);
     }
-    | ID type
+    | ID type opt_nullable
     {
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = 4;   /*length 默认为4, 这一点和Mysql不一样*/
+      $$->nullable = $3;
       free($1);
     }
     ;
@@ -1035,6 +1038,11 @@ opt_alias: /*empty*/
 
 opt_as : /*empty*/
     | AS
+    ;
+
+opt_nullable : {$$ = true;}
+    | NOT THE_NULL {$$ = false;}
+    | THE_NULL {$$ = true;}
     ;
 
 %%

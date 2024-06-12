@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/log/log.h"
 #include "common/global_context.h"
 #include "storage/table/table_meta.h"
+#include "sql/parser/value.h"
 #include "storage/trx/trx.h"
 #include "json/json.h"
 
@@ -45,7 +46,7 @@ void TableMeta::swap(TableMeta &other) noexcept
 }
 
 RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMeta> *trx_fields,
-                   span<const AttrInfoSqlNode> attributes)
+    span<const AttrInfoSqlNode> attributes)
 {
   if (common::is_blank(name)) {
     LOG_ERROR("Name cannot be empty");
@@ -60,29 +61,39 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
   RC rc = RC::SUCCESS;
 
   int field_offset  = 0;
-  int trx_field_num = 0;
+  int sys_field_num = 1;
 
   if (trx_fields != nullptr) {
-    trx_fields_ = *trx_fields;
+    sys_fields_ = *trx_fields;
 
-    fields_.resize(attributes.size() + trx_fields->size());
+    fields_.resize(attributes.size() + trx_fields->size() + 1);
 
     for (size_t i = 0; i < trx_fields->size(); i++) {
       const FieldMeta &field_meta = (*trx_fields)[i];
-      fields_[i] = FieldMeta(field_meta.name(), field_meta.type(), field_offset, field_meta.len(), false /*visible*/);
+      fields_[i]                  = FieldMeta(
+          field_meta.name(), field_meta.type(), field_offset, field_meta.len(), false /*visible*/, false /*bullable*/);
       field_offset += field_meta.len();
     }
 
-    trx_field_num = static_cast<int>(trx_fields->size());
+    sys_field_num += static_cast<int>(trx_fields->size());
   } else {
     fields_.resize(attributes.size());
   }
 
+  rc = fields_[sys_field_num - 1].init("__null_bitmap", INTS, field_offset, 4, false, false);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to init field meta. table name=%s, field name: __null_bitmap", name);
+    return rc;
+  }
+  field_offset += 4;
+
+  sys_fields_.push_back(fields_[sys_field_num - 1]);
+
   for (size_t i = 0; i < attributes.size(); i++) {
     const AttrInfoSqlNode &attr_info = attributes[i];
 
-    rc = fields_[i + trx_field_num].init(
-      attr_info.name.c_str(), attr_info.type, field_offset, attr_info.length, true /*visible*/);
+    rc = fields_[i + sys_field_num].init(
+        attr_info.name.c_str(), attr_info.type, field_offset, attr_info.length, true /*visible*/, attr_info.nullable);
     if (OB_FAIL(rc)) {
       LOG_ERROR("Failed to init field meta. table name=%s, field name: %s", name, attr_info.name.c_str());
       return rc;
@@ -109,9 +120,10 @@ const char *TableMeta::name() const { return name_.c_str(); }
 
 const FieldMeta *TableMeta::trx_field() const { return &fields_[0]; }
 
-span<const FieldMeta> TableMeta::trx_fields() const
-{
-  return span<const FieldMeta>(fields_.data(), sys_field_num());
+span<const FieldMeta> TableMeta::trx_fields() const { return span<const FieldMeta>(fields_.data(), sys_field_num()); }
+
+const FieldMeta *TableMeta::null_bitmap_field() const {
+  return &fields_[sys_field_num() - 1];
 }
 
 const FieldMeta *TableMeta::field(int index) const { return &fields_[index]; }
@@ -139,7 +151,7 @@ const FieldMeta *TableMeta::find_field_by_offset(int offset) const
 }
 int TableMeta::field_num() const { return fields_.size(); }
 
-int TableMeta::sys_field_num() const { return static_cast<int>(trx_fields_.size()); }
+int TableMeta::sys_field_num() const { return static_cast<int>(sys_fields_.size()); }
 
 const IndexMeta *TableMeta::index(const char *name) const
 {
@@ -261,7 +273,7 @@ int TableMeta::deserialize(std::istream &is)
 
   for (const FieldMeta &field_meta : fields_) {
     if (!field_meta.visible()) {
-      trx_fields_.push_back(field_meta); // 字段加上trx标识更好
+      sys_fields_.push_back(field_meta);  // 字段加上trx标识更好
     }
   }
 

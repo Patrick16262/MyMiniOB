@@ -60,8 +60,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, const std::vector
     LOG_WARN("Failed to resolve attributes, rc=%s", strrc(rc));
     return rc;
   }
-
-
+  
   if (select_sql.condition) {
     rc = select_stmt->resolve_where(select_sql.condition); 
     if (rc != RC::SUCCESS) {

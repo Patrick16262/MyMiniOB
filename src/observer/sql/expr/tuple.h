@@ -24,12 +24,14 @@ See the Mulan PSL v2 for more details. */
 #include <utility>
 #include <vector>
 
+#include "common/lang/bitmap.h"
 #include "common/log/log.h"
 #include "sql/expr/expr_type.h"
 #include "sql/expr/expression.h"
 #include "sql/expr/tuple_cell.h"
 #include "sql/parser/value.h"
 #include "sql/stmt/table_ref_desc.h"
+#include "storage/field/field_meta.h"
 #include "storage/record/record.h"
 
 class Table;
@@ -157,6 +159,13 @@ public:
     if (index < 0 || index >= static_cast<int>(fields_.size())) {
       LOG_WARN("invalid argument. index=%d", index);
       return RC::INVALID_ARGUMENT;
+    }
+
+    const FieldMeta *null_bitmap_field_meta = table_->table_meta().null_bitmap_field();
+    common::Bitmap   bitmap(record_->data() + null_bitmap_field_meta->offset(), null_bitmap_field_meta->len() * 8);
+    if (bitmap.get_bit(index)) {
+      cell.set_null();
+      return RC::SUCCESS;
     }
 
     FieldExpr       *field_expr = fields_[index];
@@ -408,12 +417,12 @@ public:
 
     const Value &value = aggr_values_[index];
 
-    if (aggr_types_[index] == AggregateType::AVG) {
+    if (aggr_types_[index] == AggregateType::AVG && value.attr_type() != NULLS) {
       int   count;
       float sum;
       sscanf(value.get_string().c_str(), "count: %d, sum: %f", &count, &sum);
       cell.set_float(sum / count);
-    } else {
+    }else {
       cell = value;
     }
 
