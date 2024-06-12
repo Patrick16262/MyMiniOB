@@ -114,7 +114,7 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
   ExpressionSqlNode *                       expression;
   std::vector<ExpressionSqlNode *> *        expression_list;
   std::vector<Value> *                      value_list;
-  std::vector<std::string> *                relation_list;
+  std::vector<std::string> *                string_list;
   char *                                    string;
   int                                       number;
   float                                     floats;
@@ -191,6 +191,7 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
 %type <update_asgn_factor>  update_asgn_factor
 %type <update_asgn_list>    update_asgn_list
 %type <booleans>            opt_nullable
+%type <string_list>         index_col_list
 
 %left IS
 %nonassoc LIKE
@@ -289,18 +290,33 @@ desc_table_stmt:
     ;
 
 create_index_stmt:    /*create index 语句的语法解析树*/
-    CREATE INDEX ID ON ID LBRACE ID RBRACE
+    CREATE INDEX ID ON ID LBRACE index_col_list RBRACE
     {
       $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
       CreateIndexSqlNode &create_index = $$->create_index;
       create_index.index_name = $3;
       create_index.relation_name = $5;
-      create_index.attribute_name = $7;
+      create_index.attribute_names.swap(*$7);
       free($3);
       free($5);
-      free($7);
+      delete $7;
     }
     ;
+
+index_col_list: ID {
+      $$ = new std::vector<std::string>;
+      $$->push_back($1);
+      free($1);
+    }
+    | ID COMMA index_col_list   {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new std::vector<std::string>;
+      }
+      $$->insert($$->begin(), $1);
+      free($1);
+    };
 
 drop_index_stmt:      /*drop index 语句的语法解析树*/
     DROP INDEX ID ON ID

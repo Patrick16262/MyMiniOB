@@ -142,7 +142,7 @@ union YYSTYPE
   ExpressionSqlNode *                       expression;
   std::vector<ExpressionSqlNode *> *        expression_list;
   std::vector<Value> *                      value_list;
-  std::vector<std::string> *                relation_list;
+  std::vector<std::string> *                string_list;
   char *                                    string;
   int                                       number;
   float                                     floats;
