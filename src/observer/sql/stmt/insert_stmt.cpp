@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/stmt/insert_stmt.h"
 #include "common/log/log.h"
+#include "mock/in_memory_text_storage.h"
 #include "sql/expr/expression.h"
 #include "sql/parser/value.h"
 #include "storage/db/db.h"
@@ -76,18 +77,31 @@ RC make_values(const vector<Value> &values, const TableMeta &meta, Value *&res, 
   // check fields type
   const int sys_field_num = meta.sys_field_num();
   for (int i = 0; i < value_num; i++) {
-    const FieldMeta *field_meta = meta.field(i + sys_field_num);
-    const AttrType   field_type = field_meta->type();
-    const AttrType   value_type = values[i].attr_type();
+    const FieldMeta *field_meta   = meta.field(i + sys_field_num);
+    const AttrType   field_type   = field_meta->type();
+    const AttrType   value_type   = values[i].attr_type();
+    Value           &res_value    = res[i];
+    const Value     &origin_value = values[i];
+
     if (value_type == AttrType::NULLS && field_meta->nullable()) {
-      res[i] = values[i];
+      res_value = origin_value;
     } else if (value_type == AttrType::NULLS && !field_meta->nullable()) {
       LOG_WARN("field is not nullable. field name=%s", field_meta->name());
       return RC::SCHEMA_FIELD_NON_NULL;
+    } else if (field_type == TEXTS) {
+      if (value_type != CHARS) {
+        LOG_WARN("covert texts from types not chars has not been supported");
+        return RC::UNIMPLENMENT;
+      }
+      if (origin_value.length() > 65536) {
+        return RC::INSERT_VALUE_TOOLONG;
+      }
+      string str = to_string(g_mem_text.put(origin_value.get_string()));
+      res_value.set_text(str.c_str());
     } else if (field_type == value_type) {
-      res[i] = values[i];
+      res_value = origin_value;
     } else {
-      RC rc = common::try_convert_value(values[i], field_type, res[i]);
+      RC rc = common::try_convert_value(origin_value, field_type, res_value);
       if (rc != RC::SUCCESS) {
         LOG_WARN("type mismatch. field type=%d, value type=%d", field_type, value_type);
         return RC::INVALID_ARGUMENT;

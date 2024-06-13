@@ -100,6 +100,7 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
         EXISTS
         IN
         INNER
+        UNIQUE
 
 
 
@@ -300,6 +301,18 @@ create_index_stmt:    /*create index 语句的语法解析树*/
       free($3);
       free($5);
       delete $7;
+    }
+    | CREATE UNIQUE INDEX ID ON ID LBRACE ID RBRACE
+    {
+      $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
+      CreateIndexSqlNode &create_index = $$->create_index;
+      create_index.index_name = $4;
+      create_index.relation_name = $6;
+      create_index.attribute_names.push_back($8);
+      create_index.unique = true;
+      free($4);
+      free($6);
+      free($8);
     }
     ;
 

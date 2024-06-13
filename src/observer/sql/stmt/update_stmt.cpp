@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/update_stmt.h"
 #include "common/log/log.h"
 #include "common/rc.h"
+#include "mock/in_memory_text_storage.h"
 #include "sql/expr/expression.h"
 #include "sql/expr/expression_resolver.h"
 #include "sql/parser/value.h"
@@ -57,7 +58,7 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
       return RC::SCHEMA_FIELD_NOT_EXIST;
     }
 
-    Value                   inplace_value;
+    Value                   origin_value;
     Value                   converted_value;
     unique_ptr<Expression>  value_expr;
     ConstExpressionResovler resolver;
@@ -71,14 +72,19 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
       return rc;
     }
 
-    rc = value_expr->try_get_value(inplace_value);
+    rc = value_expr->try_get_value(origin_value);
     if (rc != RC::SUCCESS) {
       assert(false);
     }
 
-    rc = common::try_convert_value(inplace_value, asgin_field.attr_type(), converted_value);
-    if (rc != RC::SUCCESS) {
-      return rc;
+    if (asgin_field.attr_type() == TEXTS) {
+      string key = to_string(g_mem_text.put(origin_value.get_string()));
+      converted_value.set_text(key.c_str());
+    } else {
+      rc = common::try_convert_value(origin_value, asgin_field.attr_type(), converted_value);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
     }
 
     values.push_back(converted_value);

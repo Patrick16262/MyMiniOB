@@ -66,7 +66,7 @@ UPDATE multi_index3 SET col1=2 where id=2;
 UPDATE multi_index3 SET col1=5 where col6=49;
 -- sort SELECT * FROM multi_index3;
 
--- echo 7. influence of dropping table
+-- echo 7. influence of dropping tables
 DROP table multi_index;
 
 -- echo 8. error

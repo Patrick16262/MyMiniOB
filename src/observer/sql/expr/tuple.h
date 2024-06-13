@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include <cassert>
 #include <cfloat>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <json/value.h>
 #include <memory>
@@ -26,6 +27,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "common/lang/bitmap.h"
 #include "common/log/log.h"
+#include "mock/in_memory_text_storage.h"
 #include "sql/expr/expr_type.h"
 #include "sql/expr/expression.h"
 #include "sql/expr/tuple_cell.h"
@@ -170,6 +172,13 @@ public:
 
     FieldExpr       *field_expr = fields_[index];
     const FieldMeta *field_meta = field_expr->field().meta();
+    if (field_meta->type() == TEXTS) {
+      assert(strlen(this->record_->data() + field_meta->offset()) <= 3);
+      int key = atoi(this->record_->data() + field_meta->offset());
+      cell.set_string(g_mem_text.get(key).c_str());
+      return RC::SUCCESS;
+    }
+
     cell.set_type(field_meta->type());
     cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
     return RC::SUCCESS;
@@ -422,7 +431,7 @@ public:
       float sum;
       sscanf(value.get_string().c_str(), "count: %d, sum: %f", &count, &sum);
       cell.set_float(sum / count);
-    }else {
+    } else {
       cell = value;
     }
 

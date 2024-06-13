@@ -265,7 +265,7 @@ inline std::string get_month_numeric(int month) { return std::to_string(month - 
 inline std::string get_day_of_month_with_english_suffix(int day)
 {
   static const std::string suffixes[] = {"th", "st", "nd", "th", "th", "th", "th", "th", "th", "th"};
-  return std::to_string(day) + suffixes[day % 10];
+  return std::to_string(day) + (day == 3 ? "rd" : suffixes[day % 10]);
 }
 
 //%d Day of the month, numeric (00..31)

@@ -103,26 +103,27 @@ extern int yydebug;
     EXISTS = 304,                  /* EXISTS  */
     IN = 305,                      /* IN  */
     INNER = 306,                   /* INNER  */
-    NUMBER = 307,                  /* NUMBER  */
-    FLOAT = 308,                   /* FLOAT  */
-    ID = 309,                      /* ID  */
-    SSS = 310,                     /* SSS  */
-    IS = 311,                      /* IS  */
-    LIKE = 312,                    /* LIKE  */
-    OR = 313,                      /* OR  */
-    AND = 314,                     /* AND  */
-    NOT = 315,                     /* NOT  */
-    LT = 316,                      /* LT  */
-    GT = 317,                      /* GT  */
-    LE = 318,                      /* LE  */
-    GE = 319,                      /* GE  */
-    EQ = 320,                      /* EQ  */
-    NE = 321,                      /* NE  */
-    ADD = 322,                     /* ADD  */
-    SUB = 323,                     /* SUB  */
-    STAR = 324,                    /* STAR  */
-    DIV = 325,                     /* DIV  */
-    UMINUS = 326                   /* UMINUS  */
+    UNIQUE = 307,                  /* UNIQUE  */
+    NUMBER = 308,                  /* NUMBER  */
+    FLOAT = 309,                   /* FLOAT  */
+    ID = 310,                      /* ID  */
+    SSS = 311,                     /* SSS  */
+    IS = 312,                      /* IS  */
+    LIKE = 313,                    /* LIKE  */
+    OR = 314,                      /* OR  */
+    AND = 315,                     /* AND  */
+    NOT = 316,                     /* NOT  */
+    LT = 317,                      /* LT  */
+    GT = 318,                      /* GT  */
+    LE = 319,                      /* LE  */
+    GE = 320,                      /* GE  */
+    EQ = 321,                      /* EQ  */
+    NE = 322,                      /* NE  */
+    ADD = 323,                     /* ADD  */
+    SUB = 324,                     /* SUB  */
+    STAR = 325,                    /* STAR  */
+    DIV = 326,                     /* DIV  */
+    UMINUS = 327                   /* UMINUS  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -131,7 +132,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 107 "yacc_sql.y"
+#line 108 "yacc_sql.y"
 
   ParsedSqlNode *                           sql_node;
   Value *                                   value;
@@ -159,7 +160,7 @@ union YYSTYPE
   std::vector<UpdateAssignmentSqlNode *> *        update_asgn_list;
   OrderType                                       order_type;
 
-#line 163 "yacc_sql.hpp"
+#line 164 "yacc_sql.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;
