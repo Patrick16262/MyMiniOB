@@ -78,6 +78,10 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
     }
 
     if (asgin_field.attr_type() == TEXTS) {
+      if (origin_value.length() > 65536) {
+        LOG_WARN("Text value is too long, length = %d", origin_value.length());
+        return RC::UPDATE_VALUE_TOO_LONG;
+      }
       string key = to_string(g_mem_text.put(origin_value.get_string()));
       converted_value.set_text(key.c_str());
     } else {

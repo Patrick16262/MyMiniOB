@@ -57,6 +57,7 @@ See the Mulan PSL v2 for more details. */
   DEFINE_RC(SUBQUERY_MORE_THAN_ONE_COL)  \
   DEFINE_RC(ALIAS_NOT_EXIST)             \
   DEFINE_RC(INSERT_VALUE_TOOLONG)        \
+  DEFINE_RC(UPDATE_VALUE_TOO_LONG)       \
   DEFINE_RC(IOERR_READ)                  \
   DEFINE_RC(IOERR_WRITE)                 \
   DEFINE_RC(IOERR_ACCESS)                \

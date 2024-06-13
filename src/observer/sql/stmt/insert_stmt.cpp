@@ -94,6 +94,7 @@ RC make_values(const vector<Value> &values, const TableMeta &meta, Value *&res, 
         return RC::UNIMPLENMENT;
       }
       if (origin_value.length() > 65536) {
+        LOG_WARN("Text value is too long, length = %d", origin_value.length());
         return RC::INSERT_VALUE_TOOLONG;
       }
       string str = to_string(g_mem_text.put(origin_value.get_string()));
