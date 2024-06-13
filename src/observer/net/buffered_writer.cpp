@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include <unistd.h>
 
 #include "net/buffered_writer.h"
+#include "common/log/log.h"
 
 using namespace std;
 
@@ -49,6 +50,7 @@ RC BufferedWriter::write(const char *data, int32_t size, int32_t &write_size)
   }
 
   if (buffer_.remain() == 0) {
+    LOG_WARN("buffer is full, automatically flush buffer");
     RC rc = flush_internal(size);
     if (OB_FAIL(rc)) {
       return rc;
@@ -90,6 +92,11 @@ RC BufferedWriter::flush()
     rc = flush_internal(buffer_.size());
   }
   return rc;
+}
+
+RC BufferedWriter::clean() {
+  LOG_WARN("buffer clean, unflushed data will be discarded");
+  return buffer_.forward(buffer_.size());
 }
 
 RC BufferedWriter::flush_internal(int32_t size)

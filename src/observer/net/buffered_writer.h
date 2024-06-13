@@ -57,6 +57,14 @@ public:
    */
   RC flush();
 
+
+  /**
+   * @brief 清空缓存，撤销所有未写入的数据
+   * 
+   * @return RC 
+   */
+  RC clean();
+
 private:
   /**
    * @brief 刷新缓存

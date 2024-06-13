@@ -19,7 +19,7 @@ See the Mulan PSL v2 for more details. */
 
 using namespace std;
 
-const int32_t DEFAULT_BUFFER_SIZE = 16 * 1024;
+const int32_t DEFAULT_BUFFER_SIZE = 512 * 1024; // 512kb
 
 RingBuffer::RingBuffer() : RingBuffer(DEFAULT_BUFFER_SIZE) {}
 
@@ -72,7 +72,7 @@ RC RingBuffer::buffer(const char *&buf, int32_t &read_size)
 
 RC RingBuffer::forward(int32_t size)
 {
-  if (size <= 0) {
+  if (size < 0) {
     return RC::INVALID_ARGUMENT;
   }
 

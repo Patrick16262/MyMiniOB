@@ -192,6 +192,7 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
 %type <update_asgn_factor>  update_asgn_factor
 %type <update_asgn_list>    update_asgn_list
 %type <booleans>            opt_nullable
+%type <booleans>            opt_unique;
 %type <string_list>         index_col_list
 
 %left IS
@@ -291,30 +292,24 @@ desc_table_stmt:
     ;
 
 create_index_stmt:    /*create index 语句的语法解析树*/
-    CREATE INDEX ID ON ID LBRACE index_col_list RBRACE
-    {
-      $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
-      CreateIndexSqlNode &create_index = $$->create_index;
-      create_index.index_name = $3;
-      create_index.relation_name = $5;
-      create_index.attribute_names.swap(*$7);
-      free($3);
-      free($5);
-      delete $7;
-    }
-    | CREATE UNIQUE INDEX ID ON ID LBRACE ID RBRACE
+    CREATE opt_unique INDEX ID ON ID LBRACE index_col_list RBRACE
     {
       $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
       CreateIndexSqlNode &create_index = $$->create_index;
       create_index.index_name = $4;
       create_index.relation_name = $6;
-      create_index.attribute_names.push_back($8);
-      create_index.unique = true;
+      create_index.attribute_names.swap(*$8);
+      create_index.unique = $2;
       free($4);
       free($6);
-      free($8);
+      delete $8;
     }
+
+opt_unique: /*empty*/
+    {$$ = false;}
+    | UNIQUE {$$ = true;}
     ;
+
 
 index_col_list: ID {
       $$ = new std::vector<std::string>;

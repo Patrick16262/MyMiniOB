@@ -73,6 +73,28 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "Server Plain",
+            "program": "${workspaceFolder}/${defaultBuildTask}/bin/observer",
+            "args": [
+                "-f",
+                "${workspaceFolder}/etc/observer.ini",
+                "-t",
+                "mvcc",
+                "-d",
+                "disk",
+                "-s",
+                "${workspaceFolder}/etc/minob.sock"
+            ],
+            "cwd": "${workspaceFolder}/${defaultBuildTask}/",
+            "preLaunchTask": "${defaultBuildTask}",
+            "terminal": "integrated",
+            "presentation": {
+                "clear": true
+            }
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Client",
             "program": "${workspaceFolder}/${defaultBuildTask}/bin/obclient",
             "args": [

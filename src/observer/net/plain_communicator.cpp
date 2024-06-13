@@ -39,7 +39,7 @@ RC PlainCommunicator::read_event(SessionEvent *&event)
   int data_len = 0;
   int read_len = 0;
 
-  const int    max_packet_size = 512 * 1024; //512kb
+  const int    max_packet_size = 512 * 1024;  // 512kb
   vector<char> buf(max_packet_size);
 
   // 持续接收消息，直到遇到'\0'。将'\0'遇到的后续数据直接丢弃没有处理，因为目前仅支持一收一发的模式
@@ -100,6 +100,7 @@ RC PlainCommunicator::write_state(SessionEvent *event, bool &need_disconnect)
   const int     buf_size     = 2048;
   char         *buf          = new char[buf_size];
   const string &state_string = sql_result->state_string();
+  RC            rc;
   if (state_string.empty()) {
     const char *result = RC::SUCCESS == sql_result->return_code() ? "SUCCESS" : "FAILURE";
     snprintf(buf, buf_size, "%s\n", result);
@@ -107,7 +108,15 @@ RC PlainCommunicator::write_state(SessionEvent *event, bool &need_disconnect)
     snprintf(buf, buf_size, "%s > %s\n", strrc(sql_result->return_code()), state_string.c_str());
   }
 
-  RC rc = writer_->writen(buf, strlen(buf));
+  rc = writer_->clean();
+  if (OB_FAIL(rc)) {
+    LOG_ERROR("failed to clean buffer. err=%s, rc=%s", strerror(errno), strrc(rc));
+    need_disconnect = true;
+    delete[] buf;
+    return RC::IOERR_DELETE;
+  }
+
+  rc = writer_->writen(buf, strlen(buf));
   if (OB_FAIL(rc)) {
     LOG_WARN("failed to send data to client. err=%s", strerror(errno));
     need_disconnect = true;
@@ -176,7 +185,13 @@ RC PlainCommunicator::write_result(SessionEvent *event, bool &need_disconnect)
       return rc;
     }
   }
-  writer_->flush();  // TODO handle error
+
+  rc = writer_->flush();
+  if (OB_FAIL(rc)) {
+    LOG_ERROR("Failed to flush data back to client. ret=%s, error=%s", strrc(rc), strerror(errno));
+    need_disconnect = true;
+  }
+
   return rc;
 }
 
@@ -184,7 +199,8 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
 {
   RC rc = RC::SUCCESS;
 
-  need_disconnect = true;
+  // need_disconnect = true;
+  need_disconnect = false;
 
   SqlResult *sql_result = event->sql_result();
 
@@ -198,6 +214,8 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
     sql_result->set_return_code(rc);
     return write_state(event, need_disconnect);
   }
+
+  // 输出表头
 
   const TupleSchema &schema   = sql_result->tuple_schema();
   const int          cell_num = schema.cell_num();
@@ -226,6 +244,8 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
       }
     }
   }
+
+  // 输出行数据
 
   if (cell_num > 0) {
     char newline = '\n';
@@ -260,6 +280,9 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
       Value value;
       rc = tuple->cell_at(i, value);
       if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to get cell value. rc=%s", strrc(rc));
+        event->sql_result()->set_return_code(rc);
+        write_state(event, need_disconnect);
         sql_result->close();
         return rc;
       }

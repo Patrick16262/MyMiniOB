@@ -60,7 +60,7 @@ typedef enum
 class LogClient
 {
 public:
-  LogClient(const std::string &log_file_name) : log_file_name_(log_file_name) {  };
+  LogClient(const std::string &log_file_name) : log_file_name_(log_file_name){};
   int connect();
   int sync();
 
@@ -214,17 +214,14 @@ extern Log *g_log;
       int usec = (int)tv.tv_usec;                                          \
       snprintf(sz_head,                                                    \
           LOG_HEAD_SIZE,                                                   \
-          "%04d-%02d-%02d %02d:%02d:%02u.%06d pid:%u tid:%llx ctx:%lx",    \
+          "%04d-%02d-%02d %02d:%02d:%02u.%06d ",                           \
           p->tm_year + 1900,                                               \
           p->tm_mon + 1,                                                   \
           p->tm_mday,                                                      \
           p->tm_hour,                                                      \
           p->tm_min,                                                       \
           p->tm_sec,                                                       \
-          usec,                                                            \
-          (int32_t)getpid(),                                               \
-          gettid(),                                                        \
-          common::g_log->context_id());                                    \
+          usec);                                                           \
       common::g_log->rotate(p->tm_year + 1900, p->tm_mon + 1, p->tm_mday); \
     }                                                                      \
     snprintf(prefix,                                                       \

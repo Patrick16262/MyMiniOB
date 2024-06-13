@@ -45,9 +45,10 @@ RC SqlTaskHandler::handle_event(Communicator *communicator)
 
   delete event;
 
-  if (need_disconnect) {
-    return RC::INTERNAL;
-  }
+  // if (need_disconnect) {
+  //   return RC::INTERNAL;
+  // }
+
   return RC::SUCCESS;
 }
 
